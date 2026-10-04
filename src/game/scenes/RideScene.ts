@@ -365,8 +365,10 @@ export class RideScene extends Phaser.Scene {
 
     // Trigger WOW reward popup in HUD
     EventBus.emit(GAME_EVENTS.REWARD_POPUP, {
-      text: '🎉 BẮT ĐƯỢC CHÓ! +$150',
+      text: '🎉 BẮT ĐƯỢC CHÓ!',
+      subtext: '+$150 VÀO TÚI 💵',
       amount: 150,
+      type: 'dog',
     });
 
     this.stats.dogCount += 1;

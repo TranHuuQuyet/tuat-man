@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { SFX } from '../game/audio/SoundEffects';
 import { EventBus, GAME_EVENTS } from '../game/EventBus';
 import type { GameState, HookReadyData, PullProgressData, RewardPopupData, RunStats } from '../game/EventBus';
@@ -36,8 +36,11 @@ export const GameHudOverlay: React.FC<GameHudOverlayProps> = ({
     }
   }, [stats.dogCount, prevDogCount]);
 
+  const isHookReadyRef = useRef(false);
+
   useEffect(() => {
     const unsubReady = EventBus.on(GAME_EVENTS.HOOK_READY_UPDATE, (data: HookReadyData) => {
+      isHookReadyRef.current = data.ready;
       setIsHookReady(data.ready);
       if (data.side) setHookSide(data.side);
       if (data.ready) {
@@ -53,7 +56,7 @@ export const GameHudOverlay: React.FC<GameHudOverlayProps> = ({
       } else if (data.reason !== 'SPAM') {
         setHookVisualState('MISS');
         setTimeout(() => {
-          setHookVisualState(isHookReady ? 'READY' : 'NORMAL');
+          setHookVisualState(isHookReadyRef.current ? 'READY' : 'NORMAL');
         }, 500);
       }
     });
@@ -62,7 +65,7 @@ export const GameHudOverlay: React.FC<GameHudOverlayProps> = ({
       setRewardPopup(popup);
       setTimeout(() => {
         setRewardPopup(null);
-      }, 1300);
+      }, 1800);
     });
 
     return () => {
@@ -70,7 +73,7 @@ export const GameHudOverlay: React.FC<GameHudOverlayProps> = ({
       unsubFeedback();
       unsubReward();
     };
-  }, [isHookReady]);
+  }, []);
 
   const handleToggleSound = () => {
     const newMuted = SFX.toggleMute();
@@ -150,7 +153,7 @@ export const GameHudOverlay: React.FC<GameHudOverlayProps> = ({
 
       {/* Center Screen Floating Reward Popup (First WOW Moment) */}
       {rewardPopup && (
-        <div className={`reward-popup-center reward-${rewardPopup.type}`}>
+        <div className={`reward-popup-center reward-${rewardPopup.type || 'dog'}`}>
           <div className="reward-popup-card">
             <span className="reward-popup-text">{rewardPopup.text}</span>
             {rewardPopup.subtext && (
