@@ -15,8 +15,10 @@ export function PhaserGame() {
     if (!container || gameRef.current) return;
 
     gameRef.current = createGame(container);
+    (window as any).__PHASER_GAME__ = gameRef.current;
 
     return () => {
+      delete (window as any).__PHASER_GAME__;
       gameRef.current?.destroy(true);
       gameRef.current = null;
     };
