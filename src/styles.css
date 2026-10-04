@@ -1,0 +1,56 @@
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: #050409;
+  color: #f5f0e6;
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  /* Game-friendly touch behaviour */
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior: none;
+}
+
+/* Full-screen backdrop that centers the portrait frame. */
+.viewport-backdrop {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  height: 100dvh; /* mobile browser chrome aware */
+  background: radial-gradient(ellipse at center, #1a1433 0%, #050409 70%);
+}
+
+/* Exact 9:16 portrait frame, as large as fits the screen. */
+.viewport-frame {
+  position: relative;
+  aspect-ratio: 9 / 16;
+  height: min(100%, calc(100vw * 16 / 9));
+  max-width: 100%;
+  overflow: hidden;
+  background: #0b0a1a;
+  box-shadow: 0 0 60px rgba(0, 0, 0, 0.8);
+}
+
+.phaser-container {
+  position: absolute;
+  inset: 0;
+}
+
+.phaser-container canvas {
+  display: block;
+}
