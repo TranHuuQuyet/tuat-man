@@ -69,11 +69,11 @@ export function App() {
         <StartMenuOverlay initialName={playerName} onStart={handleStartGame} />
       )}
 
-      {gameState !== 'MENU' && gameState !== 'RESULT' && (
+      {gameState !== 'MENU' && gameState !== 'RESULT' && gameState !== 'GAME_OVER' && (
         <GameHudOverlay stats={stats} gameState={gameState} pullProgress={pullProgress} />
       )}
 
-      {gameState === 'RESULT' && (
+      {(gameState === 'RESULT' || gameState === 'GAME_OVER') && (
         <ResultOverlay stats={stats} onRestart={handleRestartGame} />
       )}
     </GameViewport>
