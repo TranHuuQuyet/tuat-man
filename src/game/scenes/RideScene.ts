@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { SCENE_KEYS } from '../config';
+import { SFX } from '../audio/SoundEffects';
 import { TUNING } from '../data/tuning';
 import { CameraEffects } from '../effects/CameraEffects';
 import { DogEntity } from '../entities/DogEntity';
@@ -13,6 +13,23 @@ import { HookSystem } from '../systems/HookSystem';
 import { PullSystem } from '../systems/PullSystem';
 import { SpawnerSystem } from '../systems/SpawnerSystem';
 
+export interface TelemetryData {
+  hookAttempts: number;
+  hookHits: number;
+  hookMisses: number;
+  missReasons: Record<string, number>;
+  pullTaps: number;
+  perfectTaps: number;
+  goodTaps: number;
+  missTaps: number;
+  dogsCaught: number;
+  dogsEscaped: number;
+  crashes: number;
+  startTime: number;
+  firstHookTime: number | null;
+  firstCatchTime: number | null;
+}
+
 export class RideScene extends Phaser.Scene {
   private road!: RoadRenderer;
   private player!: PlayerBike;
@@ -24,58 +41,84 @@ export class RideScene extends Phaser.Scene {
 
   private obstacles: ObstacleEntity[] = [];
   private dogs: DogEntity[] = [];
+  private ropeGraphics!: Phaser.GameObjects.Graphics;
 
   private currentState: GameState = 'RIDE';
   private stats: RunStats = {
-    playerName: '',
+    playerName: 'Tuất Thủ',
     dogCount: 0,
     money: 0,
     score: 0,
     distance: 0,
   };
 
-  private unsubscribers: (() => void)[] = [];
-  private feedbackText: Phaser.GameObjects.Text | null = null;
-  private floatingFeedbackTween: Phaser.Tweens.Tween | null = null;
+  public telemetry: TelemetryData = {
+    hookAttempts: 0,
+    hookHits: 0,
+    hookMisses: 0,
+    missReasons: {},
+    pullTaps: 0,
+    perfectTaps: 0,
+    goodTaps: 0,
+    missTaps: 0,
+    dogsCaught: 0,
+    dogsEscaped: 0,
+    crashes: 0,
+    startTime: 0,
+    firstHookTime: null,
+    firstCatchTime: null,
+  };
+
+  private unsubscribers: Array<() => void> = [];
+  private feedbackText!: Phaser.GameObjects.Text;
+  private floatingFeedbackTween?: Phaser.Tweens.Tween;
+  private wasHookReady = false;
 
   constructor() {
-    super(SCENE_KEYS.ride);
+    super('RideScene');
   }
 
   init(data: { playerName?: string }): void {
-    this.stats.playerName = data?.playerName || 'Tuất Thủ';
+    if (data?.playerName) {
+      this.stats.playerName = data.playerName;
+    }
     this.stats.dogCount = 0;
     this.stats.money = 0;
     this.stats.score = 0;
     this.stats.distance = 0;
     this.currentState = 'RIDE';
+
+    this.telemetry.startTime = performance.now();
+    (window as unknown as { __TUAT_TELEMETRY__: TelemetryData }).__TUAT_TELEMETRY__ = this.telemetry;
   }
 
   create(): void {
+    this.camFx = new CameraEffects(this);
     this.road = new RoadRenderer(this);
     this.player = new PlayerBike(this);
     this.inputCtrl = new InputController(this);
     this.spawner = new SpawnerSystem(this);
     this.hookSys = new HookSystem();
     this.pullSys = new PullSystem();
-    this.camFx = new CameraEffects(this);
 
-    this.feedbackText = this.add.text(this.scale.width / 2, 460, '', {
-      fontFamily: 'sans-serif',
-      fontSize: '28px',
+    this.ropeGraphics = this.add.graphics();
+    this.ropeGraphics.setDepth(98);
+
+    this.feedbackText = this.add.text(this.scale.width / 2, 490, '', {
+      fontFamily: 'system-ui, -apple-system, sans-serif',
+      fontSize: '22px',
       fontStyle: 'bold',
       color: '#ffd23f',
       stroke: '#000000',
-      strokeThickness: 6,
+      strokeThickness: 5,
       align: 'center',
     });
     this.feedbackText.setOrigin(0.5);
-    this.feedbackText.setDepth(200);
-    this.feedbackText.setAlpha(0);
+    this.feedbackText.setDepth(150);
 
     this.setupListeners();
-    this.changeState('RIDE');
     this.emitStats();
+    this.changeState('RIDE');
   }
 
   private setupListeners(): void {
@@ -112,14 +155,14 @@ export class RideScene extends Phaser.Scene {
     this.feedbackText.setColor(color);
     this.feedbackText.setPosition(this.scale.width / 2, 490);
     this.feedbackText.setAlpha(1);
-    this.feedbackText.setScale(1.2);
+    this.feedbackText.setScale(1.25);
 
     this.floatingFeedbackTween = this.tweens.add({
       targets: this.feedbackText,
-      y: 440,
+      y: 430,
       scale: 1.0,
       alpha: { from: 1, to: 0 },
-      duration: 1200,
+      duration: 1300,
       ease: 'Power2',
     });
   }
@@ -127,13 +170,27 @@ export class RideScene extends Phaser.Scene {
   private handleHookInput(): void {
     if (this.currentState !== 'RIDE') return;
 
-    const res = this.hookSys.attemptHook(this.dogs, this.time.now / 1000);
+    this.telemetry.hookAttempts++;
+    SFX.playHookThrow();
+
+    const res = this.hookSys.attemptHook(this.dogs, this.player.roadX, this.time.now / 1000);
+
     if (res.success && res.dog) {
+      this.telemetry.hookHits++;
+      if (this.telemetry.firstHookTime === null) {
+        this.telemetry.firstHookTime = (performance.now() - this.telemetry.startTime) / 1000;
+      }
+
       this.camFx.hookFeedback();
       this.showFeedback('⚡ ĐÃ MÓC TRÚNG! KÉO!', '#00ff88');
       this.changeState('PULLING');
       this.pullSys.startPull(res.dog);
     } else if (res.message !== 'SPAM') {
+      this.telemetry.hookMisses++;
+      const reasonKey = res.reason || 'UNKNOWN';
+      this.telemetry.missReasons[reasonKey] = (this.telemetry.missReasons[reasonKey] || 0) + 1;
+
+      SFX.playHookMiss();
       this.showFeedback(res.message, '#ff6b6b');
     }
   }
@@ -141,19 +198,27 @@ export class RideScene extends Phaser.Scene {
   private handlePullInput(): void {
     if (this.currentState !== 'PULLING') return;
 
-    const tap = this.pullSys.registerTap();
-    this.camFx.pullTapShake();
+    const tapResult = this.pullSys.registerTap();
+    this.telemetry.pullTaps++;
+    if (tapResult.rating === 'PERFECT') this.telemetry.perfectTaps++;
+    else if (tapResult.rating === 'GOOD') this.telemetry.goodTaps++;
+    else this.telemetry.missTaps++;
 
-    if (tap.rating === 'PERFECT') {
-      this.showFeedback('🔥 PERFECT!', '#00ff88');
-    } else if (tap.rating === 'GOOD') {
-      this.showFeedback('👍 GOOD!', '#ffd23f');
+    this.camFx.pullTapShake(tapResult.rating);
+
+    if (tapResult.rating === 'PERFECT') {
+      this.showFeedback('🔥 PERFECT! +LỰC', '#00ff88');
+      this.stats.score += 25;
+      this.emitStats();
+    } else if (tapResult.rating === 'MISS') {
+      this.showFeedback('⚠️ TRẬT NHỊP!', '#ff4444');
     }
   }
 
   override update(_time: number, delta: number): void {
     const dt = Math.min(delta / 1000, 0.05);
 
+    // Keyboard Space Handler
     if (this.inputCtrl.isSpaceJustDown()) {
       if (this.currentState === 'RIDE') {
         this.handleHookInput();
@@ -166,7 +231,7 @@ export class RideScene extends Phaser.Scene {
       return;
     }
 
-    const speedMultiplier = this.currentState === 'PULLING' ? 0.6 : 1.0;
+    const speedMultiplier = this.currentState === 'PULLING' ? 0.55 : 1.0;
     const currentSpeed = TUNING.BASE_SPEED * speedMultiplier;
 
     this.stats.distance += Math.round(18 * dt * speedMultiplier);
@@ -186,6 +251,33 @@ export class RideScene extends Phaser.Scene {
       (dog) => this.dogs.push(dog),
     );
 
+    // Check dog hook readiness & orient bamboo pole side
+    let isAnyDogReady = false;
+    let targetDogSide: 'left' | 'right' = 'right';
+
+    for (const d of this.dogs) {
+      if (d.active && !d.escaped) {
+        if (d.getHookState() === 'HOOKABLE') {
+          isAnyDogReady = true;
+          targetDogSide = d.roadX < 0 ? 'left' : 'right';
+          break;
+        } else if (d.getHookState() === 'APPROACHING') {
+          targetDogSide = d.roadX < 0 ? 'left' : 'right';
+        }
+      }
+    }
+
+    this.player.setPoleSide(targetDogSide);
+
+    if (isAnyDogReady !== this.wasHookReady) {
+      this.wasHookReady = isAnyDogReady;
+      EventBus.emit(GAME_EVENTS.HOOK_READY_UPDATE, {
+        ready: isAnyDogReady,
+        side: targetDogSide,
+      });
+    }
+
+    // Update obstacles and collision check
     const playerBounds = this.player.getScreenBounds();
     for (let i = this.obstacles.length - 1; i >= 0; i--) {
       const obs = this.obstacles[i]!;
@@ -202,6 +294,7 @@ export class RideScene extends Phaser.Scene {
       }
     }
 
+    // Update dogs
     for (let i = this.dogs.length - 1; i >= 0; i--) {
       const dog = this.dogs[i]!;
       dog.update(dt, currentSpeed);
@@ -212,7 +305,29 @@ export class RideScene extends Phaser.Scene {
       }
     }
 
+    // Update Pull Mini-Game and Render Tug Rope
+    this.ropeGraphics.clear();
+
     if (this.currentState === 'PULLING') {
+      const hookedDog = this.dogs.find((d) => d.hooked);
+      if (hookedDog) {
+        const poleTip = this.player.getHookTipScreenPos();
+        const dogPos = hookedDog.getScreenPos();
+
+        // Draw vibrating tension rope between pole and dog
+        const pullProgressPct = this.pullSys.pullPower / 100;
+        const ropeColor = pullProgressPct > 0.75 ? 0x00ff88 : pullProgressPct < 0.25 ? 0xff3b3b : 0xffd23f;
+
+        this.ropeGraphics.lineStyle(3, ropeColor, 0.95);
+        this.ropeGraphics.lineBetween(poleTip.x, poleTip.y, dogPos.x, dogPos.y - 18 * dogPos.scale);
+
+        // Tension ripple rings along the cord
+        const midX = (poleTip.x + dogPos.x) / 2;
+        const midY = (poleTip.y + dogPos.y - 18 * dogPos.scale) / 2;
+        this.ropeGraphics.lineStyle(2, 0xffffff, 0.7);
+        this.ropeGraphics.strokeCircle(midX, midY, 6 + Math.sin(this.time.now * 0.02) * 2);
+      }
+
       const pullResult = this.pullSys.update(dt);
       if (pullResult === 'CAUGHT') {
         this.handleDogCaught();
@@ -223,6 +338,12 @@ export class RideScene extends Phaser.Scene {
   }
 
   private handleDogCaught(): void {
+    this.telemetry.dogsCaught++;
+    if (this.telemetry.firstCatchTime === null) {
+      this.telemetry.firstCatchTime = (performance.now() - this.telemetry.startTime) / 1000;
+    }
+
+    this.ropeGraphics.clear();
     this.camFx.catchImpact();
     this.showFeedback('🎉 BẮT ĐƯỢC CHÓ! +$150', '#00ff88');
 
@@ -246,12 +367,13 @@ export class RideScene extends Phaser.Scene {
   }
 
   private handleDogEscaped(): void {
+    this.telemetry.dogsEscaped++;
+    this.ropeGraphics.clear();
     this.showFeedback('💨 TRƯỢT RỒI! CHÓ CHẠY MẤT', '#ff9f1c');
 
     const hookedDog = this.dogs.find((d) => d.hooked);
     if (hookedDog) {
-      hookedDog.setHooked(false);
-      hookedDog.roadX += hookedDog.roadX > 0 ? 0.3 : -0.3;
+      hookedDog.setEscaped();
     }
 
     this.changeState('DOG_ESCAPED');
@@ -262,8 +384,11 @@ export class RideScene extends Phaser.Scene {
     });
   }
 
-  private handleCrash(): void {
+  public handleCrash(): void {
+    this.telemetry.crashes++;
+    this.ropeGraphics.clear();
     this.changeState('CRASH');
+    SFX.playCrash();
     this.camFx.crashImpact();
     this.showFeedback('💥 TAI NẠN! GAME OVER', '#ff3b3b');
 
@@ -285,6 +410,7 @@ export class RideScene extends Phaser.Scene {
     this.obstacles = [];
     this.dogs.forEach((d) => d.destroy());
     this.dogs = [];
+    this.ropeGraphics.clear();
     this.inputCtrl.destroy();
     this.camFx.reset();
   }

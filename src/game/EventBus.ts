@@ -24,6 +24,12 @@ export interface RunStats {
   distance: number;
 }
 
+export interface HookReadyData {
+  ready: boolean;
+  side?: 'left' | 'right';
+  dogName?: string;
+}
+
 export type EventCallback<T = any> = (data: T) => void;
 
 class EventEmitter {
@@ -70,6 +76,7 @@ export const GAME_EVENTS = {
   STATE_CHANGE: 'STATE_CHANGE',
   STATS_UPDATE: 'STATS_UPDATE',
   HOOK_FEEDBACK: 'HOOK_FEEDBACK',
+  HOOK_READY_UPDATE: 'HOOK_READY_UPDATE',
   PULL_PROGRESS: 'PULL_PROGRESS',
   GAME_OVER: 'GAME_OVER',
 } as const;

@@ -21,15 +21,21 @@ export class RoadRenderer {
     this.graphics.clear();
     const horizonY = TUNING.HORIZON_Y;
 
-    this.graphics.fillStyle(0x0b0a1a, 1);
+    // Dark sky backdrop
+    this.graphics.fillStyle(0x0a0914, 1);
     this.graphics.fillRect(0, 0, GAME_WIDTH, horizonY);
 
-    this.graphics.fillStyle(0x1a153a, 1);
-    this.graphics.fillRect(0, horizonY - 40, GAME_WIDTH, 40);
+    // City glow on horizon
+    this.graphics.fillStyle(0x19142b, 1);
+    this.graphics.fillRect(0, horizonY - 45, GAME_WIDTH, 45);
+    this.graphics.fillStyle(0x2d1a3a, 0.5);
+    this.graphics.fillRect(0, horizonY - 15, GAME_WIDTH, 15);
 
-    this.graphics.fillStyle(0x13121f, 1);
+    // Ground / terrain outside road
+    this.graphics.fillStyle(0x0f0e1a, 1);
     this.graphics.fillRect(0, horizonY, GAME_WIDTH, GAME_HEIGHT - horizonY);
 
+    // Perspective asphalt segments with alternating shades for speed feel
     const segments = TUNING.ROAD_SEGMENTS;
     for (let i = 0; i < segments; i++) {
       const zNear = i / segments;
@@ -38,19 +44,23 @@ export class RoadRenderer {
       const pNear = projectRoad(0, zNear);
       const pFar = projectRoad(0, zFar);
 
-      const stripeIndex = Math.floor((zNear * 8 + this.stripeOffset * 4) % 2);
-      const curbColor = stripeIndex === 0 ? 0xff3b3b : 0xf5f0e6;
+      // Alternating curb stripes (Red & White Vietnamese roadside curb)
+      const stripeIndex = Math.floor((zNear * 10 + this.stripeOffset * 5) % 2);
+      const curbColor = stripeIndex === 0 ? 0xee2c2c : 0xf0ece1;
 
-      const curbWidthNear = pNear.roadWidth * 0.08;
-      const curbWidthFar = pFar.roadWidth * 0.08;
+      const curbWidthNear = pNear.roadWidth * 0.085;
+      const curbWidthFar = pFar.roadWidth * 0.085;
 
-      this.graphics.fillStyle(curbColor, 0.9);
+      // Left Curb
+      this.graphics.fillStyle(curbColor, 0.95);
       this.graphics.fillPoints([
         { x: pNear.x - pNear.roadWidth / 2 - curbWidthNear, y: pNear.y },
         { x: pFar.x - pFar.roadWidth / 2 - curbWidthFar, y: pFar.y },
         { x: pFar.x - pFar.roadWidth / 2, y: pFar.y },
         { x: pNear.x - pNear.roadWidth / 2, y: pNear.y },
       ]);
+
+      // Right Curb
       this.graphics.fillPoints([
         { x: pNear.x + pNear.roadWidth / 2, y: pNear.y },
         { x: pFar.x + pFar.roadWidth / 2, y: pFar.y },
@@ -58,7 +68,8 @@ export class RoadRenderer {
         { x: pNear.x + pNear.roadWidth / 2 + curbWidthNear, y: pNear.y },
       ]);
 
-      const asphaltColor = i % 2 === 0 ? 0x242432 : 0x20202d;
+      // Asphalt roadway surface
+      const asphaltColor = i % 2 === 0 ? 0x222230 : 0x1d1d28;
       this.graphics.fillStyle(asphaltColor, 1);
       this.graphics.fillPoints([
         { x: pNear.x - pNear.roadWidth / 2, y: pNear.y },
@@ -68,27 +79,32 @@ export class RoadRenderer {
       ]);
     }
 
-    const stripeCount = 8;
-    for (let i = 0; i < stripeCount; i++) {
-      const zCenter = ((i / stripeCount) + (this.stripeOffset * (1 / stripeCount))) % 1.0;
-      if (zCenter < 0.02 || zCenter > 0.95) continue;
+    // 3 Distinct Lanes: Draw 2 dashed divider lines at roadX = -0.33 and roadX = +0.33
+    const stripeCount = 9;
+    const laneDividers = [-0.33, 0.33];
 
-      const zStripeNear = Math.max(0.01, zCenter - 0.035);
-      const zStripeFar = Math.min(0.98, zCenter + 0.035);
+    for (const dividerX of laneDividers) {
+      for (let i = 0; i < stripeCount; i++) {
+        const zCenter = ((i / stripeCount) + (this.stripeOffset * (1 / stripeCount))) % 1.0;
+        if (zCenter < 0.02 || zCenter > 0.96) continue;
 
-      const pStripeNear = projectRoad(0, zStripeNear);
-      const pStripeFar = projectRoad(0, zStripeFar);
+        const zStripeNear = Math.max(0.01, zCenter - 0.032);
+        const zStripeFar = Math.min(0.98, zCenter + 0.032);
 
-      const stripeWNear = Math.max(2, pStripeNear.roadWidth * 0.03);
-      const stripeWFar = Math.max(1, pStripeFar.roadWidth * 0.03);
+        const pNear = projectRoad(dividerX, zStripeNear);
+        const pFar = projectRoad(dividerX, zStripeFar);
 
-      this.graphics.fillStyle(0xffd23f, 0.95);
-      this.graphics.fillPoints([
-        { x: pStripeNear.x - stripeWNear / 2, y: pStripeNear.y },
-        { x: pStripeFar.x - stripeWFar / 2, y: pStripeFar.y },
-        { x: pStripeFar.x + stripeWFar / 2, y: pStripeFar.y },
-        { x: pStripeNear.x + stripeWNear / 2, y: pStripeNear.y },
-      ]);
+        const stripeWNear = Math.max(2, pNear.roadWidth * 0.022);
+        const stripeWFar = Math.max(1, pFar.roadWidth * 0.022);
+
+        this.graphics.fillStyle(0xf5f0e6, 0.85);
+        this.graphics.fillPoints([
+          { x: pNear.x - stripeWNear / 2, y: pNear.y },
+          { x: pFar.x - stripeWFar / 2, y: pFar.y },
+          { x: pFar.x + stripeWFar / 2, y: pFar.y },
+          { x: pNear.x + stripeWNear / 2, y: pNear.y },
+        ]);
+      }
     }
   }
 
