@@ -14,7 +14,7 @@ body,
   overflow: hidden;
   background: #050409;
   color: #f5f0e6;
-  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  font-family: 'Be Vietnam Pro', system-ui, -apple-system, sans-serif;
   touch-action: none;
   -webkit-user-select: none;
   user-select: none;
@@ -31,10 +31,10 @@ body,
   justify-content: center;
   height: 100vh;
   height: 100dvh;
-  background: radial-gradient(ellipse at center, #1a1433 0%, #050409 70%);
+  background: radial-gradient(ellipse at center, #191436 0%, #050409 75%);
 }
 
-/* Exact 9:16 frame */
+/* Exact 9:16 portrait frame */
 .viewport-frame {
   position: relative;
   aspect-ratio: 9 / 16;
@@ -42,7 +42,7 @@ body,
   max-width: 100%;
   overflow: hidden;
   background: #0b0a1a;
-  box-shadow: 0 0 60px rgba(0, 0, 0, 0.85);
+  box-shadow: 0 0 70px rgba(0, 0, 0, 0.9);
 }
 
 .phaser-container {
@@ -64,41 +64,44 @@ body,
   z-index: 10;
 }
 
-/* START MENU */
+/* =========================================================================
+   START MENU
+   ========================================================================= */
 .menu-overlay {
   pointer-events: auto;
   align-items: center;
   justify-content: flex-end;
-  padding-bottom: 70px;
-  background: rgba(11, 10, 26, 0.55);
+  padding-bottom: 60px;
+  background: rgba(11, 10, 26, 0.6);
 }
 
 .menu-card {
   width: 88%;
   max-width: 360px;
-  background: rgba(22, 19, 44, 0.94);
+  background: rgba(22, 19, 44, 0.96);
   border: 2px solid #ffd23f;
-  border-radius: 16px;
+  border-radius: 20px;
   padding: 24px 20px;
   text-align: center;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.8);
+  box-shadow: 0 12px 35px rgba(0, 0, 0, 0.85);
 }
 
 .menu-title {
   margin: 0;
-  font-family: Impact, "Arial Black", sans-serif;
-  font-size: 44px;
+  font-family: 'Chakra Petch', Impact, sans-serif;
+  font-size: 46px;
+  font-weight: 900;
   color: #ffd23f;
   letter-spacing: 2px;
-  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.9);
+  text-shadow: 0 3px 10px rgba(0, 0, 0, 0.9);
 }
 
 .menu-subtitle {
   margin: 4px 0 20px 0;
-  font-size: 18px;
+  font-size: 17px;
   font-weight: 800;
   color: #ff3b3b;
-  letter-spacing: 1px;
+  letter-spacing: 1.5px;
 }
 
 .menu-form {
@@ -116,13 +119,13 @@ body,
 
 .name-input {
   width: 100%;
-  height: 48px;
-  border-radius: 8px;
-  border: 2px solid #4a3e75;
+  height: 50px;
+  border-radius: 10px;
+  border: 2px solid #534585;
   background: #0f0c22;
   color: #ffd23f;
   font-size: 18px;
-  font-weight: 700;
+  font-weight: 800;
   padding: 0 14px;
   text-align: center;
   outline: none;
@@ -131,24 +134,26 @@ body,
 
 .name-input:focus {
   border-color: #ffd23f;
+  box-shadow: 0 0 12px rgba(255, 210, 63, 0.4);
 }
 
 .btn-primary {
   width: 100%;
-  height: 52px;
+  height: 54px;
   background: linear-gradient(180deg, #ffd23f 0%, #e09f00 100%);
   color: #0b0a1a;
-  border: none;
-  border-radius: 10px;
-  font-size: 19px;
+  border: 2px solid #fff;
+  border-radius: 12px;
+  font-family: 'Chakra Petch', sans-serif;
+  font-size: 20px;
   font-weight: 900;
   cursor: pointer;
-  box-shadow: 0 6px 14px rgba(255, 210, 63, 0.35);
+  box-shadow: 0 6px 16px rgba(255, 210, 63, 0.45);
   transition: transform 0.08s ease, filter 0.08s ease;
 }
 
 .btn-primary:active {
-  transform: scale(0.97);
+  transform: scale(0.96);
   filter: brightness(0.9);
 }
 
@@ -156,59 +161,199 @@ body,
   margin-top: 18px;
   font-size: 12px;
   color: #b8b0cf;
-  line-height: 1.4;
+  line-height: 1.45;
   text-align: left;
-  background: rgba(0, 0, 0, 0.3);
-  padding: 10px;
-  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.35);
+  padding: 10px 12px;
+  border-radius: 10px;
 }
 
 .menu-instructions p {
   margin: 4px 0;
 }
 
-/* TOP HUD — Compact & Readable */
+/* =========================================================================
+   TOP HUD — HIERARCHY: #1 DOG COUNT, #2 MONEY, #3 DISTANCE, SOUND TOGGLE
+   ========================================================================= */
 .hud-top {
-  display: flex;
-  justify-content: space-between;
   padding: 12px 14px;
-  pointer-events: none;
-  gap: 8px;
+  pointer-events: auto;
 }
 
-.stat-badge {
-  background: rgba(15, 12, 34, 0.78);
-  backdrop-filter: blur(4px);
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  border-radius: 8px;
-  padding: 5px 8px;
+.hud-badges-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+
+.hud-badge {
+  display: flex;
+  align-items: center;
+  border-radius: 12px;
+  backdrop-filter: blur(8px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.6);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+/* #1 Primary Progression Badge: Dog Count */
+.badge-primary-dog {
+  flex: 1.35;
+  background: linear-gradient(135deg, rgba(35, 28, 65, 0.95) 0%, rgba(18, 14, 38, 0.95) 100%);
+  border: 2px solid #ffd23f;
+  padding: 5px 10px;
+  gap: 8px;
+  box-shadow: 0 0 16px rgba(255, 210, 63, 0.35);
+}
+
+.badge-pop {
+  animation: dog-counter-pop 0.5s ease-out;
+}
+
+@keyframes dog-counter-pop {
+  0% { transform: scale(1); }
+  40% { transform: scale(1.18); filter: drop-shadow(0 0 12px #ffd23f); }
+  100% { transform: scale(1); }
+}
+
+.badge-icon-box {
+  font-size: 22px;
+}
+
+.badge-info {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  min-width: 74px;
+  line-height: 1.1;
 }
 
-.stat-label {
+.badge-title {
   font-size: 10px;
-  font-weight: 700;
-  color: #a09abc;
+  font-weight: 800;
+  color: #d1c8e8;
+  letter-spacing: 0.5px;
 }
 
-.stat-val {
-  font-size: 15px;
+.badge-count-val {
+  font-family: 'Chakra Petch', sans-serif;
+  font-size: 20px;
   font-weight: 900;
-  color: #ffffff;
-}
-
-.stat-gold {
   color: #ffd23f;
 }
 
-.stat-green {
+/* #2 Reward: Money Earned */
+.badge-money {
+  flex: 1.1;
+  background: rgba(12, 28, 22, 0.92);
+  border: 1.5px solid #00ff88;
+  padding: 6px 10px;
+  gap: 5px;
+  justify-content: center;
+  box-shadow: 0 0 12px rgba(0, 255, 136, 0.25);
+}
+
+.badge-money-symbol {
+  font-size: 15px;
+}
+
+.badge-money-val {
+  font-family: 'Chakra Petch', sans-serif;
+  font-size: 17px;
+  font-weight: 900;
   color: #00ff88;
 }
 
-/* PULL OVERLAY */
+/* #3 Secondary: Odometer Distance */
+.badge-odometer {
+  flex: 0.95;
+  background: rgba(18, 16, 32, 0.88);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  padding: 6px 8px;
+  gap: 4px;
+  justify-content: center;
+}
+
+.odometer-icon {
+  font-size: 13px;
+}
+
+.odometer-val {
+  font-family: 'Chakra Petch', sans-serif;
+  font-size: 14px;
+  font-weight: 800;
+  color: #e6e2f0;
+}
+
+/* Sound Mute/Unmute Button */
+.btn-sound-toggle {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: rgba(28, 24, 52, 0.9);
+  border: 1.5px solid rgba(255, 255, 255, 0.25);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  cursor: pointer;
+  color: #ffffff;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5);
+  transition: transform 0.08s ease, background 0.1s ease;
+}
+
+.btn-sound-toggle:active {
+  transform: scale(0.9);
+  background: rgba(45, 38, 85, 0.9);
+}
+
+/* =========================================================================
+   CENTER FLOATING REWARD POPUP (FIRST WOW MOMENT)
+   ========================================================================= */
+.reward-popup-center {
+  position: absolute;
+  top: 36%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  z-index: 120;
+  animation: reward-burst 1.2s cubic-bezier(0.18, 0.89, 0.32, 1.28) forwards;
+}
+
+.reward-popup-card {
+  background: linear-gradient(135deg, rgba(28, 22, 58, 0.98) 0%, rgba(12, 10, 26, 0.98) 100%);
+  border: 2px solid #ffd23f;
+  border-radius: 18px;
+  padding: 16px 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  box-shadow: 0 0 35px rgba(255, 210, 63, 0.7);
+}
+
+.reward-popup-text {
+  font-family: 'Chakra Petch', Impact, sans-serif;
+  font-size: 26px;
+  font-weight: 900;
+  color: #ffd23f;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.9);
+}
+
+.reward-popup-subtext {
+  font-size: 14px;
+  font-weight: 800;
+  color: #00ff88;
+  margin-top: 4px;
+}
+
+@keyframes reward-burst {
+  0% { transform: translate(-50%, -40%) scale(0.6); opacity: 0; }
+  25% { transform: translate(-50%, -50%) scale(1.15); opacity: 1; }
+  75% { transform: translate(-50%, -52%) scale(1.0); opacity: 1; }
+  100% { transform: translate(-50%, -70%) scale(0.85); opacity: 0; }
+}
+
+/* =========================================================================
+   PULL OVERLAY — PRESSURE GAUGE WITH TENSION
+   ========================================================================= */
 .pull-container {
   flex: 1;
   display: flex;
@@ -218,43 +363,43 @@ body,
 }
 
 .pull-card {
-  background: rgba(15, 12, 34, 0.94);
-  backdrop-filter: blur(6px);
+  background: rgba(15, 12, 34, 0.95);
+  backdrop-filter: blur(8px);
   border: 2px solid #ffd23f;
-  border-radius: 16px;
-  padding: 16px 22px;
+  border-radius: 20px;
+  padding: 18px 24px;
   display: flex;
   flex-direction: column;
   align-items: center;
-  box-shadow: 0 0 24px rgba(255, 210, 63, 0.4);
+  box-shadow: 0 0 28px rgba(255, 210, 63, 0.4);
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
 .pull-card.tension-normal {
   border-color: #ffd23f;
-  box-shadow: 0 0 20px rgba(255, 210, 63, 0.35);
+  box-shadow: 0 0 24px rgba(255, 210, 63, 0.4);
 }
 
 .pull-card.tension-high {
   border-color: #00ff88;
-  box-shadow: 0 0 35px rgba(0, 255, 136, 0.7);
+  box-shadow: 0 0 45px rgba(0, 255, 136, 0.85);
   animation: pulse-high 0.35s infinite alternate;
 }
 
 @keyframes pulse-high {
-  from { transform: scale(1); box-shadow: 0 0 25px rgba(0, 255, 136, 0.5); }
-  to { transform: scale(1.03); box-shadow: 0 0 45px rgba(0, 255, 136, 0.9); }
+  from { transform: scale(1); box-shadow: 0 0 30px rgba(0, 255, 136, 0.6); }
+  to { transform: scale(1.035); box-shadow: 0 0 55px rgba(0, 255, 136, 0.95); }
 }
 
 .pull-card.tension-danger {
   border-color: #ff3b3b;
-  box-shadow: 0 0 35px rgba(255, 59, 59, 0.7);
-  animation: pulse-danger 0.3s infinite alternate;
+  box-shadow: 0 0 40px rgba(255, 59, 59, 0.8);
+  animation: pulse-danger 0.28s infinite alternate;
 }
 
 @keyframes pulse-danger {
-  from { transform: scale(1); box-shadow: 0 0 20px rgba(255, 59, 59, 0.5); }
-  to { transform: scale(1.02); box-shadow: 0 0 45px rgba(255, 59, 59, 0.9); }
+  from { transform: scale(1); box-shadow: 0 0 24px rgba(255, 59, 59, 0.5); }
+  to { transform: scale(1.025); box-shadow: 0 0 50px rgba(255, 59, 59, 0.95); }
 }
 
 .pull-header {
@@ -262,11 +407,12 @@ body,
   justify-content: space-between;
   width: 100%;
   gap: 16px;
-  margin-bottom: 10px;
+  margin-bottom: 12px;
 }
 
 .pull-title {
-  font-size: 15px;
+  font-family: 'Chakra Petch', sans-serif;
+  font-size: 16px;
   font-weight: 900;
   color: #ffd23f;
 }
@@ -279,8 +425,8 @@ body,
 
 .circular-progress {
   position: relative;
-  width: 110px;
-  height: 110px;
+  width: 116px;
+  height: 116px;
 }
 
 .circular-svg {
@@ -292,25 +438,25 @@ body,
 .circle-bg {
   fill: none;
   stroke: rgba(255, 255, 255, 0.12);
-  stroke-width: 10;
+  stroke-width: 11;
 }
 
 .circle-fill {
   fill: none;
   stroke: #00ff88;
-  stroke-width: 10;
+  stroke-width: 11;
   stroke-linecap: round;
   transition: stroke-dashoffset 0.05s linear;
 }
 
 .circle-fill.tension-high {
   stroke: #00ff88;
-  filter: drop-shadow(0 0 8px #00ff88);
+  filter: drop-shadow(0 0 10px #00ff88);
 }
 
 .circle-fill.tension-danger {
   stroke: #ff3b3b;
-  filter: drop-shadow(0 0 8px #ff3b3b);
+  filter: drop-shadow(0 0 10px #ff3b3b);
 }
 
 .circular-content {
@@ -323,7 +469,8 @@ body,
 }
 
 .pull-number {
-  font-size: 26px;
+  font-family: 'Chakra Petch', sans-serif;
+  font-size: 28px;
   font-weight: 900;
   color: #ffffff;
 }
@@ -332,44 +479,49 @@ body,
   font-size: 10px;
   font-weight: 800;
   color: #a09abc;
+  letter-spacing: 0.5px;
 }
 
 .rating-badge {
-  margin-top: 8px;
-  font-size: 13px;
+  margin-top: 10px;
+  font-family: 'Chakra Petch', sans-serif;
+  font-size: 14px;
   font-weight: 900;
-  padding: 4px 12px;
+  padding: 4px 14px;
   border-radius: 12px;
   animation: badge-pop 0.15s ease-out;
 }
 
 @keyframes badge-pop {
-  from { transform: scale(0.8); }
+  from { transform: scale(0.75); }
   to { transform: scale(1); }
 }
 
 .rating-perfect {
   background: #00ff88;
   color: #0b0a1a;
-  box-shadow: 0 0 14px rgba(0, 255, 136, 0.6);
+  box-shadow: 0 0 16px rgba(0, 255, 136, 0.7);
 }
 
 .rating-good {
   background: #ffd23f;
   color: #0b0a1a;
-  box-shadow: 0 0 10px rgba(255, 210, 63, 0.4);
+  box-shadow: 0 0 12px rgba(255, 210, 63, 0.5);
 }
 
 .rating-miss {
   background: #ff3b3b;
   color: #ffffff;
-  box-shadow: 0 0 12px rgba(255, 59, 59, 0.5);
+  box-shadow: 0 0 14px rgba(255, 59, 59, 0.6);
 }
 
-/* BOTTOM CONTROLS */
+/* =========================================================================
+   BOTTOM CONTROLS — TACTILE 3D ARCADE BUTTONS
+   ========================================================================= */
 .hud-bottom {
   margin-top: auto;
   padding: 14px;
+  padding-bottom: max(16px, env(safe-area-inset-bottom));
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -384,54 +536,70 @@ body,
 
 .btn-control {
   border: none;
-  border-radius: 12px;
+  border-radius: 14px;
+  font-family: 'Chakra Petch', sans-serif;
   font-weight: 900;
   cursor: pointer;
   user-select: none;
   -webkit-user-select: none;
   touch-action: manipulation;
-  min-height: 52px; /* Meets >44px touch target requirement */
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.6);
-  transition: transform 0.06s ease, filter 0.06s ease;
+  min-height: 56px; /* Meets >48px touch target */
+  transition: transform 0.06s ease, filter 0.06s ease, box-shadow 0.06s ease;
 }
 
-.btn-control:active {
-  transform: scale(0.95);
-  filter: brightness(0.9);
-}
-
+/* Steering Buttons — 3D Slate Arcade with Neon Accents */
 .btn-steer {
   flex: 1;
-  background: rgba(38, 33, 70, 0.9);
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: linear-gradient(180deg, #2a244d 0%, #171330 100%);
+  border: 1.5px solid rgba(255, 255, 255, 0.22);
+  border-bottom: 3.5px solid #0f0c22;
   color: #f5f0e6;
-  font-size: 16px;
+  font-size: 17px;
+  letter-spacing: 0.5px;
+  box-shadow: 0 5px 12px rgba(0, 0, 0, 0.6);
 }
 
+.btn-steer:active {
+  transform: translateY(2px) scale(0.97);
+  border-bottom-width: 1.5px;
+  filter: brightness(1.15);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+}
+
+/* Primary Action Buttons */
 .btn-action {
   flex: 1;
-  font-size: 18px;
-  min-height: 58px;
+  font-size: 19px;
+  min-height: 60px;
+  letter-spacing: 0.5px;
 }
 
-/* HOOK BUTTON STATES */
+/* HOOK BUTTON — Dynamic States */
 .btn-hook {
   background: linear-gradient(180deg, #ffd23f 0%, #d89600 100%);
+  border: 2px solid #fff;
+  border-bottom: 4px solid #996800;
   color: #0b0a1a;
-  border: 2px solid #ffe885;
-  transition: background 0.1s ease, border-color 0.1s ease, box-shadow 0.1s ease;
+  box-shadow: 0 6px 16px rgba(255, 210, 63, 0.4);
+}
+
+.btn-hook:active {
+  transform: translateY(2px) scale(0.97);
+  border-bottom-width: 2px;
+  filter: brightness(0.92);
 }
 
 .btn-hook.hook-ready-pulse {
   background: linear-gradient(180deg, #00ff88 0%, #00b35f 100%) !important;
   color: #05140b !important;
   border: 2px solid #afffd3 !important;
-  animation: hook-pulse 0.4s infinite alternate;
+  border-bottom: 4px solid #006636 !important;
+  animation: hook-pulse 0.35s infinite alternate;
 }
 
 @keyframes hook-pulse {
-  from { transform: scale(1); box-shadow: 0 0 15px rgba(0, 255, 136, 0.5); }
-  to { transform: scale(1.03); box-shadow: 0 0 35px rgba(0, 255, 136, 0.95); }
+  from { transform: scale(1); box-shadow: 0 0 20px rgba(0, 255, 136, 0.6); }
+  to { transform: scale(1.03); box-shadow: 0 0 42px rgba(0, 255, 136, 0.95); }
 }
 
 .btn-hook-miss {
@@ -455,27 +623,31 @@ body,
 /* PULL BUTTON */
 .btn-pull {
   background: linear-gradient(180deg, #ff3b3b 0%, #c1121f 100%);
-  color: #ffffff;
   border: 2px solid #ffd23f;
-  animation: pulse-button 0.35s infinite alternate;
+  border-bottom: 4px solid #800a12;
+  color: #ffffff;
+  box-shadow: 0 6px 20px rgba(255, 59, 59, 0.55);
+  animation: pulse-button 0.32s infinite alternate;
 }
 
 .btn-pull.btn-pull-tapped {
-  transform: scale(0.94);
-  filter: brightness(1.2);
+  transform: translateY(2px) scale(0.95);
+  filter: brightness(1.25);
 }
 
 @keyframes pulse-button {
-  from { transform: scale(1); box-shadow: 0 0 12px rgba(255, 59, 59, 0.4); }
-  to { transform: scale(1.02); box-shadow: 0 0 28px rgba(255, 59, 59, 0.8); }
+  from { transform: scale(1); box-shadow: 0 0 16px rgba(255, 59, 59, 0.5); }
+  to { transform: scale(1.025); box-shadow: 0 0 32px rgba(255, 59, 59, 0.9); }
 }
 
-/* RESULT OVERLAY */
+/* =========================================================================
+   RESULT OVERLAY — GAME OVER SUMMARY
+   ========================================================================= */
 .result-overlay {
   pointer-events: auto;
   align-items: center;
   justify-content: center;
-  background: rgba(11, 10, 26, 0.85);
+  background: rgba(11, 10, 26, 0.88);
   padding: 20px;
 }
 
@@ -484,15 +656,16 @@ body,
   max-width: 360px;
   background: rgba(22, 19, 44, 0.96);
   border: 2px solid #ff3b3b;
-  border-radius: 18px;
-  padding: 24px 20px;
+  border-radius: 20px;
+  padding: 26px 22px;
   text-align: center;
-  box-shadow: 0 12px 35px rgba(0, 0, 0, 0.9);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.9);
 }
 
 .result-title {
   margin: 0;
-  font-size: 28px;
+  font-family: 'Chakra Petch', Impact, sans-serif;
+  font-size: 32px;
   font-weight: 900;
   color: #ff3b3b;
 }
@@ -509,9 +682,9 @@ body,
   flex-direction: column;
   gap: 10px;
   margin-bottom: 22px;
-  background: rgba(0, 0, 0, 0.35);
-  padding: 14px;
-  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.4);
+  padding: 16px;
+  border-radius: 12px;
 }
 
 .result-stat-row {
@@ -525,6 +698,7 @@ body,
 }
 
 .result-value {
+  font-family: 'Chakra Petch', sans-serif;
   font-weight: 800;
   color: #f5f0e6;
 }
@@ -538,7 +712,20 @@ body,
 }
 
 .btn-restart {
+  width: 100%;
+  height: 52px;
+  border-radius: 12px;
+  border: 2px solid #afffd3;
   background: linear-gradient(180deg, #00ff88 0%, #00b35f 100%);
   color: #0b0a1a;
-  box-shadow: 0 6px 14px rgba(0, 255, 136, 0.35);
+  font-family: 'Chakra Petch', sans-serif;
+  font-size: 19px;
+  font-weight: 900;
+  cursor: pointer;
+  box-shadow: 0 6px 18px rgba(0, 255, 136, 0.4);
+  transition: transform 0.08s ease;
+}
+
+.btn-restart:active {
+  transform: scale(0.96);
 }

@@ -87,26 +87,30 @@ class SoundEffectsManager {
     if (!ctx || !this.engineGain) return;
 
     try {
-      this.engineOsc = ctx.createOscillator();
-      this.engineSubOsc = ctx.createOscillator();
-      this.engineFilter = ctx.createFilter();
+      const osc = ctx.createOscillator();
+      const subOsc = ctx.createOscillator();
+      const filter = ctx.createBiquadFilter();
 
-      this.engineOsc.type = 'sawtooth';
-      this.engineOsc.frequency.setValueAtTime(50, ctx.currentTime);
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(50, ctx.currentTime);
 
-      this.engineSubOsc.type = 'triangle';
-      this.engineSubOsc.frequency.setValueAtTime(25, ctx.currentTime);
+      subOsc.type = 'triangle';
+      subOsc.frequency.setValueAtTime(25, ctx.currentTime);
 
-      this.engineFilter.type = 'lowpass';
-      this.engineFilter.frequency.setValueAtTime(320, ctx.currentTime);
-      this.engineFilter.Q.setValueAtTime(3, ctx.currentTime);
+      filter.type = 'lowpass';
+      filter.frequency.setValueAtTime(320, ctx.currentTime);
+      filter.Q.setValueAtTime(3, ctx.currentTime);
 
-      this.engineOsc.connect(this.engineFilter);
-      this.engineSubOsc.connect(this.engineFilter);
-      this.engineFilter.connect(this.engineGain);
+      osc.connect(filter);
+      subOsc.connect(filter);
+      filter.connect(this.engineGain);
 
-      this.engineOsc.start();
-      this.engineSubOsc.start();
+      osc.start();
+      subOsc.start();
+
+      this.engineOsc = osc;
+      this.engineSubOsc = subOsc;
+      this.engineFilter = filter;
       this.isEngineRunning = true;
     } catch {
       // Audio context might need user gesture

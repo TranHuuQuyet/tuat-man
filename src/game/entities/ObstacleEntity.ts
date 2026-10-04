@@ -55,6 +55,17 @@ export class ObstacleEntity {
       this.blinkLight.fillStyle(0x774900, 0.8);
       this.blinkLight.fillCircle(0, -56, 5);
     }
+
+    // Advance lane hazard telegraph indicator when approaching (z between 0.22 and 0.85)
+    if (this.z >= 0.22 && this.z <= 0.85) {
+      const pulse = 0.7 + 0.3 * Math.sin(this.blinkPhase * 1.2);
+      // Danger triangle/chevron above barrier
+      this.blinkLight.fillStyle(0xff2222, pulse);
+      this.blinkLight.fillTriangle(0, -68, -10, -84, 10, -84);
+      this.blinkLight.fillStyle(0xffffff, 0.95);
+      this.blinkLight.fillRect(-2, -82, 4, 7);
+      this.blinkLight.fillRect(-2, -73, 4, 2);
+    }
   }
 
   private renderObstacle(): void {

@@ -30,6 +30,12 @@ export interface HookReadyData {
   dogName?: string;
 }
 
+export interface RewardPopupData {
+  text: string;
+  subtext?: string;
+  type: 'dog' | 'money' | 'combo';
+}
+
 export type EventCallback<T = any> = (data: T) => void;
 
 class EventEmitter {
@@ -78,5 +84,8 @@ export const GAME_EVENTS = {
   HOOK_FEEDBACK: 'HOOK_FEEDBACK',
   HOOK_READY_UPDATE: 'HOOK_READY_UPDATE',
   PULL_PROGRESS: 'PULL_PROGRESS',
+  REWARD_POPUP: 'REWARD_POPUP',
+  AUDIO_MUTE_TOGGLE: 'AUDIO_MUTE_TOGGLE',
   GAME_OVER: 'GAME_OVER',
 } as const;
+

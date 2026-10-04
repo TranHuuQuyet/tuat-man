@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
+import { SFX } from '../game/audio/SoundEffects';
 import { EventBus, GAME_EVENTS } from '../game/EventBus';
-import type { GameState, HookReadyData, PullProgressData, RunStats } from '../game/EventBus';
+import type { GameState, HookReadyData, PullProgressData, RewardPopupData, RunStats } from '../game/EventBus';
 
 interface GameHudOverlayProps {
   stats: RunStats;
@@ -8,7 +9,7 @@ interface GameHudOverlayProps {
   pullProgress: PullProgressData | null;
 }
 
-type HookButtonVisualState = 'NORMAL' | 'READY' | 'PRESSED' | 'MISS' | 'SUCCESS';
+type HookButtonVisualState = 'NORMAL' | 'APPROACHING' | 'READY' | 'PRESSED' | 'MISS' | 'SUCCESS';
 
 export const GameHudOverlay: React.FC<GameHudOverlayProps> = ({
   stats,
@@ -20,6 +21,20 @@ export const GameHudOverlay: React.FC<GameHudOverlayProps> = ({
   const [hookSide, setHookSide] = useState<'left' | 'right'>('right');
   const [hookVisualState, setHookVisualState] = useState<HookButtonVisualState>('NORMAL');
   const [pullTapAnim, setPullTapAnim] = useState(false);
+  const [isMuted, setIsMuted] = useState<boolean>(() => SFX.getMuted());
+  const [rewardPopup, setRewardPopup] = useState<RewardPopupData | null>(null);
+  const [prevDogCount, setPrevDogCount] = useState(stats.dogCount);
+  const [dogPopAnim, setDogPopAnim] = useState(false);
+
+  // Animate dog badge when count increases
+  useEffect(() => {
+    if (stats.dogCount > prevDogCount) {
+      setDogPopAnim(true);
+      const timer = setTimeout(() => setDogPopAnim(false), 600);
+      setPrevDogCount(stats.dogCount);
+      return () => clearTimeout(timer);
+    }
+  }, [stats.dogCount, prevDogCount]);
 
   useEffect(() => {
     const unsubReady = EventBus.on(GAME_EVENTS.HOOK_READY_UPDATE, (data: HookReadyData) => {
@@ -43,11 +58,25 @@ export const GameHudOverlay: React.FC<GameHudOverlayProps> = ({
       }
     });
 
+    const unsubReward = EventBus.on(GAME_EVENTS.REWARD_POPUP, (popup: RewardPopupData) => {
+      setRewardPopup(popup);
+      setTimeout(() => {
+        setRewardPopup(null);
+      }, 1300);
+    });
+
     return () => {
       unsubReady();
       unsubFeedback();
+      unsubReward();
     };
   }, [isHookReady]);
+
+  const handleToggleSound = () => {
+    const newMuted = SFX.toggleMute();
+    setIsMuted(newMuted);
+    EventBus.emit(GAME_EVENTS.AUDIO_MUTE_TOGGLE, newMuted);
+  };
 
   const handleSteerLeftStart = () => {
     EventBus.emit(GAME_EVENTS.INPUT_STEER_LEFT, true);
@@ -70,11 +99,11 @@ export const GameHudOverlay: React.FC<GameHudOverlayProps> = ({
 
   const handlePullClick = () => {
     setPullTapAnim(true);
-    setTimeout(() => setPullTapAnim(false), 80);
+    setTimeout(() => setPullTapAnim(false), 90);
     EventBus.emit(GAME_EVENTS.INPUT_PULL);
   };
 
-  // Determine circular meter urgency class
+  // Determine circular meter tension class
   let tensionClass = 'tension-normal';
   if (pullProgress) {
     if (pullProgress.power >= 75) tensionClass = 'tension-high';
@@ -83,29 +112,61 @@ export const GameHudOverlay: React.FC<GameHudOverlayProps> = ({
 
   return (
     <div className="ui-overlay hud-overlay">
-      {/* Top Header Stats */}
+      {/* Top Header — Clear Hierarchy: #1 DOGS, #2 MONEY, #3 DISTANCE */}
       <header className="hud-top">
-        <div className="stat-badge">
-          <span className="stat-label">🐕 CHÓ</span>
-          <span className="stat-val stat-gold">{stats.dogCount}</span>
-        </div>
-        <div className="stat-badge">
-          <span className="stat-label">💵 TIỀN</span>
-          <span className="stat-val stat-green">${stats.money}</span>
-        </div>
-        <div className="stat-badge">
-          <span className="stat-label">🛣️ ĐƯỜNG</span>
-          <span className="stat-val">{stats.distance}m</span>
+        <div className="hud-badges-row">
+          {/* #1 Primary Progression: Dog Count */}
+          <div className={`hud-badge badge-primary-dog ${dogPopAnim ? 'badge-pop' : ''}`}>
+            <div className="badge-icon-box">🐕</div>
+            <div className="badge-info">
+              <span className="badge-title">ĐÃ BẮT</span>
+              <span className="badge-count-val">{stats.dogCount}</span>
+            </div>
+          </div>
+
+          {/* #2 Reward: Money Earned */}
+          <div className="hud-badge badge-money">
+            <span className="badge-money-symbol">💵</span>
+            <span className="badge-money-val">${stats.money}</span>
+          </div>
+
+          {/* #3 Secondary: Odometer Distance */}
+          <div className="hud-badge badge-odometer">
+            <span className="odometer-icon">🛣️</span>
+            <span className="odometer-val">{stats.distance}m</span>
+          </div>
+
+          {/* Sound Mute/Unmute Quick Toggle */}
+          <button
+            type="button"
+            className="btn-sound-toggle"
+            onClick={handleToggleSound}
+            aria-label="Toggle Sound"
+          >
+            {isMuted ? '🔇' : '🔊'}
+          </button>
         </div>
       </header>
 
-      {/* Pull Mini-game Circular Gauge */}
+      {/* Center Screen Floating Reward Popup (First WOW Moment) */}
+      {rewardPopup && (
+        <div className={`reward-popup-center reward-${rewardPopup.type}`}>
+          <div className="reward-popup-card">
+            <span className="reward-popup-text">{rewardPopup.text}</span>
+            {rewardPopup.subtext && (
+              <span className="reward-popup-subtext">{rewardPopup.subtext}</span>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Pull Mini-game Pressure Gauge */}
       {isPulling && pullProgress && (
         <div className="pull-container">
           <div className={`pull-card ${tensionClass}`}>
             <div className="pull-header">
               <span className="pull-title">
-                {pullProgress.power >= 80 ? '🔥 SẮP BẮT ĐƯỢC! KÉO TIẾP!' : '⚡ KÉO GIẰNG CO!'}
+                {pullProgress.power >= 80 ? '🔥 SẮP BẮT ĐƯỢC! KÉO MAU!' : '⚡ KÉO GIẰNG CO!'}
               </span>
               <span className="pull-timer">⏳ {pullProgress.timeLeft.toFixed(1)}s</span>
             </div>
@@ -132,7 +193,7 @@ export const GameHudOverlay: React.FC<GameHudOverlayProps> = ({
 
             {pullProgress.rating && (
               <div className={`rating-badge rating-${pullProgress.rating.toLowerCase()}`}>
-                {pullProgress.rating === 'PERFECT' && '🔥 PERFECT!'}
+                {pullProgress.rating === 'PERFECT' && '🔥 PERFECT! +LỰC'}
                 {pullProgress.rating === 'GOOD' && '👍 GOOD!'}
                 {pullProgress.rating === 'MISS' && '⚠️ TRẬT NHỊP!'}
               </div>
@@ -141,7 +202,7 @@ export const GameHudOverlay: React.FC<GameHudOverlayProps> = ({
         </div>
       )}
 
-      {/* Bottom Controls */}
+      {/* Bottom Controls — Mobile Friendly, Safe Area Aware */}
       <footer className="hud-bottom">
         <div className="control-group steer-group">
           <button
@@ -153,7 +214,7 @@ export const GameHudOverlay: React.FC<GameHudOverlayProps> = ({
             onPointerCancel={handleSteerLeftEnd}
             aria-label="Trái"
           >
-            ◄ TRÁI
+            ◀ TRÁI
           </button>
           <button
             type="button"
@@ -164,7 +225,7 @@ export const GameHudOverlay: React.FC<GameHudOverlayProps> = ({
             onPointerCancel={handleSteerRightEnd}
             aria-label="Phải"
           >
-            PHẢI ►
+            PHẢI ▶
           </button>
         </div>
 
@@ -191,7 +252,7 @@ export const GameHudOverlay: React.FC<GameHudOverlayProps> = ({
               className={`btn-control btn-action btn-pull ${pullTapAnim ? 'btn-pull-tapped' : ''}`}
               onClick={handlePullClick}
             >
-              🔥 KÉO LIÊN TỤC! (SPAM)
+              🔥 KÉO MẠNH! (SPAM)
             </button>
           )}
         </div>

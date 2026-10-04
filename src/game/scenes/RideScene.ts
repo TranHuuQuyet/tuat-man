@@ -73,6 +73,7 @@ export class RideScene extends Phaser.Scene {
   private feedbackText!: Phaser.GameObjects.Text;
   private floatingFeedbackTween?: Phaser.Tweens.Tween;
   private wasHookReady = false;
+  private isHitStop = false;
 
   constructor() {
     super('RideScene');
@@ -119,6 +120,10 @@ export class RideScene extends Phaser.Scene {
     this.setupListeners();
     this.emitStats();
     this.changeState('RIDE');
+
+    // Start Web Audio engine and BGM
+    SFX.startBgm();
+    SFX.startEngine();
   }
 
   private setupListeners(): void {
@@ -216,6 +221,8 @@ export class RideScene extends Phaser.Scene {
   }
 
   override update(_time: number, delta: number): void {
+    if (this.isHitStop) return;
+
     const dt = Math.min(delta / 1000, 0.05);
 
     // Keyboard Space Handler
@@ -243,6 +250,9 @@ export class RideScene extends Phaser.Scene {
     const steer = this.inputCtrl.getSteerDirection();
     this.player.update(dt, steer);
     this.camFx.steerTilt(this.player.currentLean);
+
+    // Dynamic engine throttle pitch and revving
+    SFX.updateEngine(speedMultiplier, Math.abs(steer) > 0.15);
 
     this.spawner.update(
       dt,
@@ -343,9 +353,21 @@ export class RideScene extends Phaser.Scene {
       this.telemetry.firstCatchTime = (performance.now() - this.telemetry.startTime) / 1000;
     }
 
+    // 60ms hit-stop freeze impact
+    this.isHitStop = true;
+    this.time.delayedCall(60, () => {
+      this.isHitStop = false;
+    });
+
     this.ropeGraphics.clear();
     this.camFx.catchImpact();
     this.showFeedback('🎉 BẮT ĐƯỢC CHÓ! +$150', '#00ff88');
+
+    // Trigger WOW reward popup in HUD
+    EventBus.emit(GAME_EVENTS.REWARD_POPUP, {
+      text: '🎉 BẮT ĐƯỢC CHÓ! +$150',
+      amount: 150,
+    });
 
     this.stats.dogCount += 1;
     this.stats.money += 150;
@@ -388,6 +410,8 @@ export class RideScene extends Phaser.Scene {
     this.telemetry.crashes++;
     this.ropeGraphics.clear();
     this.changeState('CRASH');
+    SFX.stopEngine();
+    SFX.stopBgm();
     SFX.playCrash();
     this.camFx.crashImpact();
     this.showFeedback('💥 TAI NẠN! GAME OVER', '#ff3b3b');
@@ -404,6 +428,8 @@ export class RideScene extends Phaser.Scene {
   }
 
   private cleanup(): void {
+    SFX.stopEngine();
+    SFX.stopBgm();
     this.unsubscribers.forEach((unsub) => unsub());
     this.unsubscribers = [];
     this.obstacles.forEach((o) => o.destroy());
