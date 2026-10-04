@@ -2,9 +2,8 @@ import Phaser from 'phaser';
 import { COLORS, GAME_HEIGHT, GAME_WIDTH, SCENE_KEYS } from '../config';
 
 /**
- * Foundation placeholder scene (Phase 0).
- * Only proves that React + Phaser + the 9:16 viewport work end-to-end.
- * Contains NO gameplay. Will become the real asset preloader in Phase 1.
+ * BootScene: handles asset preloading and title display.
+ * When START_GAME event is received, transitions to RideScene.
  */
 export class BootScene extends Phaser.Scene {
   constructor() {
@@ -16,33 +15,31 @@ export class BootScene extends Phaser.Scene {
     const centerY = GAME_HEIGHT / 2;
 
     this.add
-      .text(centerX, centerY - 60, 'TUẤT MAN', {
+      .text(centerX, centerY - 140, 'TUẤT MAN', {
         fontFamily: 'Impact, "Arial Black", sans-serif',
-        fontSize: '120px',
+        fontSize: '110px',
         color: toCss(COLORS.neonYellow),
         stroke: '#000000',
-        strokeThickness: 12,
+        strokeThickness: 14,
       })
       .setOrigin(0.5);
 
     this.add
-      .text(centerX, centerY + 50, 'ĐÊM NAY CÓ KÈO', {
+      .text(centerX, centerY - 30, 'ĐÊM NAY CÓ KÈO', {
         fontFamily: '"Arial Black", sans-serif',
-        fontSize: '44px',
+        fontSize: '38px',
         color: toCss(COLORS.neonRed),
         stroke: '#000000',
         strokeThickness: 8,
       })
       .setOrigin(0.5);
 
+    // Decorative motorbike icon
     this.add
-      .text(centerX, GAME_HEIGHT - 60, 'Phase 0 — foundation', {
-        fontFamily: 'sans-serif',
-        fontSize: '24px',
-        color: toCss(COLORS.textLight),
+      .text(centerX, centerY + 80, '🏍️ 🐕 💨', {
+        fontSize: '48px',
       })
-      .setOrigin(0.5)
-      .setAlpha(0.5);
+      .setOrigin(0.5);
   }
 }
 

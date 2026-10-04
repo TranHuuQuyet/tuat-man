@@ -1,10 +1,12 @@
 import Phaser from 'phaser';
-import { COLORS, GAME_HEIGHT, GAME_WIDTH } from './config';
+import { COLORS, GAME_HEIGHT, GAME_WIDTH, SCENE_KEYS } from './config';
 import { BootScene } from './scenes/BootScene';
+import { RideScene } from './scenes/RideScene';
+import { EventBus, GAME_EVENTS } from './EventBus';
 
 /** Creates the Phaser game inside the given DOM element. */
 export function createGame(parent: HTMLElement): Phaser.Game {
-  return new Phaser.Game({
+  const game = new Phaser.Game({
     type: Phaser.AUTO,
     parent,
     width: GAME_WIDTH,
@@ -19,8 +21,25 @@ export function createGame(parent: HTMLElement): Phaser.Game {
       powerPreference: 'high-performance',
     },
     input: {
-      activePointers: 3, // multi-touch: steer + hook/pull at the same time (Phase 1+)
+      activePointers: 3,
     },
-    scene: [BootScene],
+    scene: [BootScene, RideScene],
   });
+
+  // Listen to START_GAME event to transition from BootScene to RideScene
+  const unsub = EventBus.on(GAME_EVENTS.START_GAME, (data: { playerName: string }) => {
+    if (game.scene.isActive(SCENE_KEYS.boot)) {
+      game.scene.stop(SCENE_KEYS.boot);
+      game.scene.start(SCENE_KEYS.ride, data);
+    }
+  });
+
+  // Attach cleanup hook to game instance
+  const originalDestroy = game.destroy.bind(game);
+  game.destroy = (removeCanvas: boolean, noReturn?: boolean) => {
+    unsub();
+    return originalDestroy(removeCanvas, noReturn);
+  };
+
+  return game;
 }
