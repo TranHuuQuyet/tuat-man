@@ -355,9 +355,9 @@ export class RideScene extends Phaser.Scene {
 
     // 60ms hit-stop freeze impact
     this.isHitStop = true;
-    this.time.delayedCall(60, () => {
+    setTimeout(() => {
       this.isHitStop = false;
-    });
+    }, 60);
 
     this.ropeGraphics.clear();
     this.camFx.catchImpact();
@@ -383,11 +383,11 @@ export class RideScene extends Phaser.Scene {
     }
 
     this.changeState('DOG_CAUGHT');
-    this.time.delayedCall(700, () => {
+    setTimeout(() => {
       if (this.currentState !== 'CRASH') {
         this.changeState('RIDE');
       }
-    });
+    }, 700);
   }
 
   private handleDogEscaped(): void {
@@ -401,11 +401,11 @@ export class RideScene extends Phaser.Scene {
     }
 
     this.changeState('DOG_ESCAPED');
-    this.time.delayedCall(700, () => {
+    setTimeout(() => {
       if (this.currentState !== 'CRASH') {
         this.changeState('RIDE');
       }
-    });
+    }, 700);
   }
 
   public handleCrash(): void {
@@ -418,10 +418,10 @@ export class RideScene extends Phaser.Scene {
     this.camFx.crashImpact();
     this.showFeedback('💥 TAI NẠN! GAME OVER', '#ff3b3b');
 
-    this.time.delayedCall(900, () => {
+    setTimeout(() => {
       this.changeState('GAME_OVER');
       EventBus.emit(GAME_EVENTS.GAME_OVER, { ...this.stats });
-    });
+    }, 900);
   }
 
   private restartGame(): void {
