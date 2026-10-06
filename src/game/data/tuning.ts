@@ -1,3 +1,6 @@
+export type Lane = -1 | 0 | 1;
+export const LANES: readonly Lane[] = [-1, 0, 1] as const;
+
 export const TUNING = {
   // Road & Perspective
   HORIZON_Y: 420,
@@ -10,10 +13,14 @@ export const TUNING = {
   BASE_SPEED: 0.28,
   ROAD_STRIPE_SPEED: 1.8,
 
-  // Lanes
+  // Lanes (3-Lane Runner Model: LEFT = -1, CENTER = 0, RIGHT = 1)
   LANE_LEFT: -0.55,
   LANE_CENTER: 0.0,
   LANE_RIGHT: 0.55,
+  LANE_DIVIDER_LEFT: -0.33,
+  LANE_DIVIDER_RIGHT: 0.33,
+  LANE_SWITCH_SPEED: 9.0, // Lerp speed for smooth lane shift
+  LANE_SWITCH_COOLDOWN: 0.12,
 
   // Player
   PLAYER_Z: 0.12,
@@ -54,3 +61,18 @@ export const TUNING = {
   SHAKE_CRASH_INTENSITY: 0.038,
   SHAKE_CRASH_DURATION: 650,
 } as const;
+
+export function getLaneRoadX(lane: Lane): number {
+  if (lane === -1) return TUNING.LANE_LEFT;
+  if (lane === 1) return TUNING.LANE_RIGHT;
+  return TUNING.LANE_CENTER;
+}
+
+export function getNearestLane(roadX: number): Lane {
+  const dLeft = Math.abs(roadX - TUNING.LANE_LEFT);
+  const dCenter = Math.abs(roadX - TUNING.LANE_CENTER);
+  const dRight = Math.abs(roadX - TUNING.LANE_RIGHT);
+  if (dLeft <= dCenter && dLeft <= dRight) return -1;
+  if (dRight <= dCenter && dRight <= dLeft) return 1;
+  return 0;
+}

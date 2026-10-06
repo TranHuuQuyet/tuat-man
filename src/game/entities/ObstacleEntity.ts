@@ -1,4 +1,6 @@
 import Phaser from 'phaser';
+import { getLaneRoadX } from '../data/tuning';
+import type { Lane } from '../data/tuning';
 import { projectRoad } from '../utils/projection';
 
 export class ObstacleEntity {
@@ -7,12 +9,14 @@ export class ObstacleEntity {
   private blinkLight: Phaser.GameObjects.Graphics;
   private blinkPhase = 0;
 
+  public lane: Lane;
   public roadX: number;
   public z: number;
   public active = true;
 
-  constructor(scene: Phaser.Scene, roadX: number, z = 1.0) {
-    this.roadX = roadX;
+  constructor(scene: Phaser.Scene, lane: Lane, z = 1.0) {
+    this.lane = lane;
+    this.roadX = getLaneRoadX(lane);
     this.z = z;
 
     this.container = scene.add.container(0, 0);
@@ -96,20 +100,42 @@ export class ObstacleEntity {
     this.graphics.fillRect(-4, -54, 8, 8);
   }
 
-  public checkCollision(playerScreenBounds: { x: number; y: number; radiusX: number; radiusY: number }): boolean {
-    // Only collide when close in perspective (z roughly between 0.08 and 0.18)
-    if (this.z > 0.19 || this.z < 0.05) return false;
+  public checkCollision(
+    playerLane: Lane,
+    playerRoadX: number,
+    playerScreenBounds?: { x: number; y: number; radiusX: number; radiusY: number },
+  ): boolean {
+    // Only collide when close in perspective (z roughly between 0.05 and 0.18)
+    if (this.z > 0.18 || this.z < 0.05) return false;
 
-    const pt = projectRoad(this.roadX, this.z);
-    const obsY = pt.y - 20 * pt.scale;
-    const obsRadiusX = 26 * pt.scale;
-    const obsRadiusY = 18 * pt.scale;
+    // Primary check: Lane match
+    const isSameLane = playerLane === this.lane;
+    const roadXDist = Math.abs(playerRoadX - this.roadX);
 
-    const dx = Math.abs(pt.x - playerScreenBounds.x);
-    const dy = Math.abs(obsY - playerScreenBounds.y);
+    // If player is safely in another lane, zero collision
+    if (!isSameLane && roadXDist > 0.28) {
+      return false;
+    }
 
-    return dx < (obsRadiusX + playerScreenBounds.radiusX) &&
-           dy < (obsRadiusY + playerScreenBounds.radiusY);
+    // If in same lane or transition distance within hitbox
+    if (roadXDist < 0.32) {
+      return true;
+    }
+
+    if (playerScreenBounds) {
+      const pt = projectRoad(this.roadX, this.z);
+      const obsY = pt.y - 20 * pt.scale;
+      const obsRadiusX = 26 * pt.scale;
+      const obsRadiusY = 18 * pt.scale;
+
+      const dx = Math.abs(pt.x - playerScreenBounds.x);
+      const dy = Math.abs(obsY - playerScreenBounds.y);
+
+      return dx < (obsRadiusX + playerScreenBounds.radiusX) &&
+             dy < (obsRadiusY + playerScreenBounds.radiusY);
+    }
+
+    return false;
   }
 
   public destroy(): void {

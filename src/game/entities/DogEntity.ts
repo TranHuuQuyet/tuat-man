@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import type { DogConfig } from '../data/dogs';
-import { TUNING } from '../data/tuning';
+import { getLaneRoadX, TUNING } from '../data/tuning';
+import type { Lane } from '../data/tuning';
 import { projectRoad } from '../utils/projection';
 
 export type DogHookState = 'OUT_OF_RANGE' | 'APPROACHING' | 'HOOKABLE' | 'PASSED' | 'HOOKED' | 'ESCAPED';
@@ -12,6 +13,7 @@ export class DogEntity {
   private rangeIndicator: Phaser.GameObjects.Graphics;
 
   public config: DogConfig;
+  public lane: Lane;
   public roadX: number;
   public z: number;
   public active = true;
@@ -19,9 +21,10 @@ export class DogEntity {
   public escaped = false;
   private pulsePhase = 0;
 
-  constructor(scene: Phaser.Scene, config: DogConfig, roadX: number, z = 1.0) {
+  constructor(scene: Phaser.Scene, config: DogConfig, lane: Lane, z = 1.0) {
     this.config = config;
-    this.roadX = roadX;
+    this.lane = lane;
+    this.roadX = getLaneRoadX(lane);
     this.z = z;
 
     this.container = scene.add.container(0, 0);
@@ -76,9 +79,9 @@ export class DogEntity {
         this.active = false;
       }
     } else {
-      // Hooked: dog struggles and resists, jittering
-      const struggleX = Math.sin(this.pulsePhase * 3) * 0.015;
-      const targetSide = this.roadX > 0 ? 1.05 : -1.05;
+      // Hooked: dog struggles and resists, jittering near its lane
+      const struggleX = Math.sin(this.pulsePhase * 3) * 0.03;
+      const targetSide = getLaneRoadX(this.lane) + (this.lane >= 0 ? 0.22 : -0.22);
       this.roadX = Phaser.Math.Linear(this.roadX, targetSide + struggleX, 0.05);
     }
 

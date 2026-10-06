@@ -1,15 +1,21 @@
 import Phaser from 'phaser';
 import { DEFAULT_DOG } from '../data/dogs';
-import { TUNING } from '../data/tuning';
+import { LANES, TUNING } from '../data/tuning';
+import type { Lane } from '../data/tuning';
 import { DogEntity } from '../entities/DogEntity';
 import { ObstacleEntity } from '../entities/ObstacleEntity';
 
+export type SpawnPattern =
+  | 'SINGLE_OBSTACLE'
+  | 'TWO_LANE_BLOCK'
+  | 'DOG_TARGET'
+  | 'DOG_AND_OBSTACLE';
+
 export class SpawnerSystem {
   private scene: Phaser.Scene;
-  private obstacleTimer = 2.4;
-  private dogTimer = 0.2; // Immediate first dog on game start for instant action!
-  private lastObstacleLane = 0;
-  private isFirstDog = true;
+  private spawnTimer = 0.4; // First wave quickly after start for immediate action
+  private lastObstacleLane: Lane = 0;
+  private isFirstWave = true;
 
   constructor(scene: Phaser.Scene) {
     this.scene = scene;
@@ -18,52 +24,107 @@ export class SpawnerSystem {
   public update(
     dt: number,
     isPulling: boolean,
+    activeDogsCount: number,
     onSpawnObstacle: (obs: ObstacleEntity) => void,
     onSpawnDog: (dog: DogEntity) => void,
   ): void {
-    // If pulling, freeze new obstacle spawning to maintain fair focus on the tug-of-war
+    // If pulling, freeze spawning to maintain fair focus on tug-of-war
     if (isPulling) return;
 
-    // Obstacle timer
-    this.obstacleTimer -= dt;
-    if (this.obstacleTimer <= 0) {
-      this.obstacleTimer = Phaser.Math.FloatBetween(
+    this.spawnTimer -= dt;
+    if (this.spawnTimer <= 0) {
+      this.spawnTimer = Phaser.Math.FloatBetween(
         TUNING.OBSTACLE_MIN_INTERVAL,
         TUNING.OBSTACLE_MAX_INTERVAL,
       );
 
-      // 3 clear lanes: Left (-0.55), Center (0.0), Right (0.55)
-      const lanes = [TUNING.LANE_LEFT, TUNING.LANE_CENTER, TUNING.LANE_RIGHT];
-      const availableLanes = lanes.filter((l) => l !== this.lastObstacleLane);
-      const lane = availableLanes[Phaser.Math.Between(0, availableLanes.length - 1)]!;
-      this.lastObstacleLane = lane;
+      if (this.isFirstWave) {
+        this.isFirstWave = false;
+        // First wave: Dog in LEFT lane at z = 0.55 for instant action!
+        this.spawnPattern('DOG_TARGET', onSpawnObstacle, onSpawnDog, { dogLane: -1, z: 0.55 });
+        return;
+      }
 
-      const obs = new ObstacleEntity(this.scene, lane, 1.0);
-      onSpawnObstacle(obs);
+      // Pattern selection
+      let pattern: SpawnPattern;
+      if (activeDogsCount > 0) {
+        // Dog already on road: spawn obstacles only
+        pattern = Math.random() < 0.7 ? 'SINGLE_OBSTACLE' : 'TWO_LANE_BLOCK';
+      } else {
+        const roll = Math.random();
+        if (roll < 0.35) {
+          pattern = 'DOG_AND_OBSTACLE';
+        } else if (roll < 0.65) {
+          pattern = 'DOG_TARGET';
+        } else if (roll < 0.85) {
+          pattern = 'SINGLE_OBSTACLE';
+        } else {
+          pattern = 'TWO_LANE_BLOCK';
+        }
+      }
+
+      this.spawnPattern(pattern, onSpawnObstacle, onSpawnDog);
     }
+  }
 
-    // Dog timer
-    this.dogTimer -= dt;
-    if (this.dogTimer <= 0) {
-      this.dogTimer = Phaser.Math.FloatBetween(
-        TUNING.DOG_MIN_INTERVAL,
-        TUNING.DOG_MAX_INTERVAL,
-      );
+  public spawnPattern(
+    pattern: SpawnPattern,
+    onSpawnObstacle: (obs: ObstacleEntity) => void,
+    onSpawnDog: (dog: DogEntity) => void,
+    overrides?: { dogLane?: Lane; obstacleLane?: Lane; z?: number },
+  ): void {
+    const z = overrides?.z ?? 1.0;
 
-      // Dogs spawn on roadside shoulders (Left: -1.15, Right: 1.15)
-      const side = Math.random() < 0.5 ? -1.15 : 1.15;
-      const initialZ = this.isFirstDog ? 0.48 : 1.0;
-      this.isFirstDog = false;
+    switch (pattern) {
+      case 'SINGLE_OBSTACLE': {
+        const availableLanes = LANES.filter((l) => l !== this.lastObstacleLane);
+        const lane = overrides?.obstacleLane ?? availableLanes[Phaser.Math.Between(0, availableLanes.length - 1)]!;
+        this.lastObstacleLane = lane;
+        const obs = new ObstacleEntity(this.scene, lane, z);
+        onSpawnObstacle(obs);
+        break;
+      }
 
-      const dog = new DogEntity(this.scene, DEFAULT_DOG, side, initialZ);
-      onSpawnDog(dog);
+      case 'TWO_LANE_BLOCK': {
+        // Pick one safe lane that remains open (player can always pass)
+        const safeLane: Lane = LANES[Phaser.Math.Between(0, LANES.length - 1)]!;
+        const blockedLanes = LANES.filter((l) => l !== safeLane);
+        for (const lane of blockedLanes) {
+          const obs = new ObstacleEntity(this.scene, lane, z);
+          onSpawnObstacle(obs);
+        }
+        break;
+      }
+
+      case 'DOG_TARGET': {
+        const lane = overrides?.dogLane ?? LANES[Phaser.Math.Between(0, LANES.length - 1)]!;
+        const dog = new DogEntity(this.scene, DEFAULT_DOG, lane, z);
+        onSpawnDog(dog);
+        break;
+      }
+
+      case 'DOG_AND_OBSTACLE': {
+        // Dog and obstacle in distinct lanes (NEVER the same lane)
+        const dogLane: Lane = overrides?.dogLane ?? LANES[Phaser.Math.Between(0, LANES.length - 1)]!;
+        const availableObstacleLanes = LANES.filter((l) => l !== dogLane);
+        const obstacleLane: Lane = overrides?.obstacleLane ??
+          availableObstacleLanes[Phaser.Math.Between(0, availableObstacleLanes.length - 1)]!;
+
+        this.lastObstacleLane = obstacleLane;
+
+        const dog = new DogEntity(this.scene, DEFAULT_DOG, dogLane, z);
+        const obs = new ObstacleEntity(this.scene, obstacleLane, z);
+
+        onSpawnDog(dog);
+        onSpawnObstacle(obs);
+        break;
+      }
     }
   }
 
   public reset(): void {
-    this.obstacleTimer = 2.4;
-    this.dogTimer = 0.2;
+    this.spawnTimer = 0.4;
     this.lastObstacleLane = 0;
-    this.isFirstDog = true;
+    this.isFirstWave = true;
   }
 }

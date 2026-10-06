@@ -1,6 +1,8 @@
 import Phaser from 'phaser';
 import { SFX } from '../audio/SoundEffects';
+import { DEFAULT_DOG } from '../data/dogs';
 import { TUNING } from '../data/tuning';
+import type { Lane } from '../data/tuning';
 import { CameraEffects } from '../effects/CameraEffects';
 import { DogEntity } from '../entities/DogEntity';
 import { ObstacleEntity } from '../entities/ObstacleEntity';
@@ -25,6 +27,9 @@ export interface TelemetryData {
   dogsCaught: number;
   dogsEscaped: number;
   crashes: number;
+  laneSwitches: number;
+  leftSwitches: number;
+  rightSwitches: number;
   startTime: number;
   firstHookTime: number | null;
   firstCatchTime: number | null;
@@ -64,6 +69,9 @@ export class RideScene extends Phaser.Scene {
     dogsCaught: 0,
     dogsEscaped: 0,
     crashes: 0,
+    laneSwitches: 0,
+    leftSwitches: 0,
+    rightSwitches: 0,
     startTime: 0,
     firstHookTime: null,
     firstCatchTime: null,
@@ -89,6 +97,9 @@ export class RideScene extends Phaser.Scene {
     this.stats.distance = 0;
     this.currentState = 'RIDE';
 
+    this.telemetry.laneSwitches = 0;
+    this.telemetry.leftSwitches = 0;
+    this.telemetry.rightSwitches = 0;
     this.telemetry.startTime = performance.now();
     (window as unknown as { __TUAT_TELEMETRY__: TelemetryData }).__TUAT_TELEMETRY__ = this.telemetry;
   }
@@ -101,6 +112,8 @@ export class RideScene extends Phaser.Scene {
     this.spawner = new SpawnerSystem(this);
     this.hookSys = new HookSystem();
     this.pullSys = new PullSystem();
+
+    (window as unknown as { __TUAT_SCENE__: RideScene }).__TUAT_SCENE__ = this;
 
     this.ropeGraphics = this.add.graphics();
     this.ropeGraphics.setDepth(98);
@@ -178,7 +191,7 @@ export class RideScene extends Phaser.Scene {
     this.telemetry.hookAttempts++;
     SFX.playHookThrow();
 
-    const res = this.hookSys.attemptHook(this.dogs, this.player.roadX, this.time.now / 1000);
+    const res = this.hookSys.attemptHook(this.dogs, this.player.targetLane, this.player.roadX, this.time.now / 1000);
 
     if (res.success && res.dog) {
       this.telemetry.hookHits++;
@@ -247,27 +260,40 @@ export class RideScene extends Phaser.Scene {
 
     this.road.update(dt, speedMultiplier);
 
-    const steer = this.inputCtrl.getSteerDirection();
-    this.player.update(dt, steer);
+    const laneChange = this.inputCtrl.consumeLaneChange();
+    if (laneChange !== 0) {
+      const switched = this.player.moveLane(laneChange);
+      if (switched) {
+        this.telemetry.laneSwitches++;
+        if (laneChange === -1) {
+          this.telemetry.leftSwitches++;
+        } else {
+          this.telemetry.rightSwitches++;
+        }
+      }
+    }
+
+    this.player.update(dt);
     this.camFx.steerTilt(this.player.currentLean);
 
     // Dynamic engine throttle pitch and revving
-    SFX.updateEngine(speedMultiplier, Math.abs(steer) > 0.15);
+    SFX.updateEngine(speedMultiplier, Math.abs(this.player.currentLean) > 0.05);
 
     this.spawner.update(
       dt,
       this.currentState === 'PULLING',
+      this.dogs.filter((d) => d.active && !d.hooked).length,
       (obs) => this.obstacles.push(obs),
       (dog) => this.dogs.push(dog),
     );
 
-    // Check dog hook readiness & orient bamboo pole side
+    // Check dog hook readiness & orient bamboo pole side (requires player to be in dog's lane!)
     let isAnyDogReady = false;
     let targetDogSide: 'left' | 'right' = 'right';
 
     for (const d of this.dogs) {
       if (d.active && !d.escaped) {
-        if (d.getHookState() === 'HOOKABLE') {
+        if (d.getHookState() === 'HOOKABLE' && d.lane === this.player.targetLane) {
           isAnyDogReady = true;
           targetDogSide = d.roadX < 0 ? 'left' : 'right';
           break;
@@ -287,13 +313,13 @@ export class RideScene extends Phaser.Scene {
       });
     }
 
-    // Update obstacles and collision check
+    // Update obstacles and collision check (enforcing lane match)
     const playerBounds = this.player.getScreenBounds();
     for (let i = this.obstacles.length - 1; i >= 0; i--) {
       const obs = this.obstacles[i]!;
       obs.update(dt, currentSpeed);
 
-      if (obs.checkCollision(playerBounds)) {
+      if (obs.checkCollision(this.player.targetLane, this.player.roadX, playerBounds)) {
         this.handleCrash();
         return;
       }
@@ -445,5 +471,34 @@ export class RideScene extends Phaser.Scene {
 
   public cleanupAndShutdown(): void {
     this.cleanup();
+  }
+
+  // --- Test & Inspection Helpers ---
+  public getPlayer(): PlayerBike {
+    return this.player;
+  }
+
+  public getDogs(): DogEntity[] {
+    return this.dogs;
+  }
+
+  public getObstacles(): ObstacleEntity[] {
+    return this.obstacles;
+  }
+
+  public spawnTestObstacle(lane: Lane, z: number): ObstacleEntity {
+    const obs = new ObstacleEntity(this, lane, z);
+    this.obstacles.push(obs);
+    return obs;
+  }
+
+  public spawnTestDog(lane: Lane, z: number): DogEntity {
+    const dog = new DogEntity(this, DEFAULT_DOG, lane, z);
+    this.dogs.push(dog);
+    return dog;
+  }
+
+  public getTelemetry(): TelemetryData {
+    return this.telemetry;
   }
 }

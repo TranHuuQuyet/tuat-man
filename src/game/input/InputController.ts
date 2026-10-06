@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { TUNING } from '../data/tuning';
 import { EventBus, GAME_EVENTS } from '../EventBus';
 
 export class InputController {
@@ -8,13 +9,20 @@ export class InputController {
   private keyD: Phaser.Input.Keyboard.Key | null = null;
   private keySpace: Phaser.Input.Keyboard.Key | null = null;
 
-  private uiSteerLeft = false;
-  private uiSteerRight = false;
+  private pendingLaneChange: -1 | 0 | 1 = 0;
+  private lastLaneChangeTime = 0;
+
+  // Swipe detection
+  private touchStartX = 0;
+  private touchStartY = 0;
+  private isSwiping = false;
+
   private unsubscribers: (() => void)[] = [];
 
   constructor(scene: Phaser.Scene) {
     this.scene = scene;
     this.setupKeyboard();
+    this.setupSwipe();
     this.setupEventBus();
   }
 
@@ -26,24 +34,72 @@ export class InputController {
     this.keySpace = this.scene.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
   }
 
+  private setupSwipe(): void {
+    this.scene.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
+      this.touchStartX = pointer.x;
+      this.touchStartY = pointer.y;
+      this.isSwiping = true;
+    });
+
+    this.scene.input.on('pointermove', (pointer: Phaser.Input.Pointer) => {
+      if (!this.isSwiping) return;
+      const dx = pointer.x - this.touchStartX;
+      const dy = pointer.y - this.touchStartY;
+      const minSwipeDistance = 32;
+
+      if (Math.abs(dx) >= minSwipeDistance && Math.abs(dx) > Math.abs(dy) * 1.2) {
+        this.triggerLaneChange(dx < 0 ? -1 : 1);
+        this.isSwiping = false; // Consume swipe
+      }
+    });
+
+    this.scene.input.on('pointerup', () => {
+      this.isSwiping = false;
+    });
+  }
+
   private setupEventBus(): void {
     this.unsubscribers.push(
       EventBus.on(GAME_EVENTS.INPUT_STEER_LEFT, (active: boolean) => {
-        this.uiSteerLeft = active;
+        if (active) this.triggerLaneChange(-1);
       }),
       EventBus.on(GAME_EVENTS.INPUT_STEER_RIGHT, (active: boolean) => {
-        this.uiSteerRight = active;
+        if (active) this.triggerLaneChange(1);
       }),
     );
   }
 
-  public getSteerDirection(): number {
-    let dir = 0;
-    const isLeft = (this.cursors?.left.isDown ?? false) || (this.keyA?.isDown ?? false) || this.uiSteerLeft;
-    const isRight = (this.cursors?.right.isDown ?? false) || (this.keyD?.isDown ?? false) || this.uiSteerRight;
-    if (isLeft) dir -= 1;
-    if (isRight) dir += 1;
-    return dir;
+  public triggerLaneChange(direction: -1 | 1): void {
+    const now = performance.now() / 1000;
+    if (now - this.lastLaneChangeTime < TUNING.LANE_SWITCH_COOLDOWN) {
+      return;
+    }
+    this.pendingLaneChange = direction;
+    this.lastLaneChangeTime = now;
+  }
+
+  /**
+   * Consumes queued lane switch command from keyboard, swipe, or onscreen UI.
+   * Returns -1 (LEFT), 1 (RIGHT), or 0 (NONE).
+   */
+  public consumeLaneChange(): -1 | 0 | 1 {
+    // Check keyboard single-press triggers
+    const isLeftKey =
+      (this.cursors?.left && Phaser.Input.Keyboard.JustDown(this.cursors.left)) ||
+      (this.keyA && Phaser.Input.Keyboard.JustDown(this.keyA));
+    const isRightKey =
+      (this.cursors?.right && Phaser.Input.Keyboard.JustDown(this.cursors.right)) ||
+      (this.keyD && Phaser.Input.Keyboard.JustDown(this.keyD));
+
+    if (isLeftKey) {
+      this.triggerLaneChange(-1);
+    } else if (isRightKey) {
+      this.triggerLaneChange(1);
+    }
+
+    const change = this.pendingLaneChange;
+    this.pendingLaneChange = 0;
+    return change;
   }
 
   public isSpaceJustDown(): boolean {
@@ -51,6 +107,9 @@ export class InputController {
   }
 
   public destroy(): void {
+    this.scene.input.off('pointerdown');
+    this.scene.input.off('pointermove');
+    this.scene.input.off('pointerup');
     this.unsubscribers.forEach((unsub) => unsub());
     this.unsubscribers = [];
   }

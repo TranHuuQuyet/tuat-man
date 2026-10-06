@@ -79,9 +79,9 @@ export class RoadRenderer {
       ]);
     }
 
-    // 3 Distinct Lanes: Draw 2 dashed divider lines at roadX = -0.33 and roadX = +0.33
+    // 3 Distinct Lanes: Draw 2 dashed divider lines using TUNING source of truth
     const stripeCount = 9;
-    const laneDividers = [-0.33, 0.33];
+    const laneDividers = [TUNING.LANE_DIVIDER_LEFT, TUNING.LANE_DIVIDER_RIGHT];
 
     for (const dividerX of laneDividers) {
       for (let i = 0; i < stripeCount; i++) {

@@ -1,3 +1,4 @@
+import type { Lane } from '../data/tuning';
 import { DogEntity } from '../entities/DogEntity';
 import { EventBus, GAME_EVENTS } from '../EventBus';
 
@@ -14,7 +15,7 @@ export class HookSystem {
   private lastHookAttemptTime = 0;
   private minInterval = 0.12; // 120ms debounce for rapid clicking/tapping
 
-  public attemptHook(dogs: DogEntity[], playerRoadX: number, currentTime: number): HookResult {
+  public attemptHook(dogs: DogEntity[], playerLane: Lane, playerRoadX: number, currentTime: number): HookResult {
     if (currentTime - this.lastHookAttemptTime < this.minInterval) {
       return { success: false, message: 'SPAM', reason: 'SPAM' };
     }
@@ -49,17 +50,17 @@ export class HookSystem {
       return { success: false, message: msg, reason: 'TOO_LATE' };
     }
 
-    // Reason 3: Dog is in hook window (HOOKABLE), but is player on the right side of the road?
-    // Left dog (roadX < 0): player cannot reach from far right lane (playerRoadX > 0.35)
-    // Right dog (roadX > 0): player cannot reach from far left lane (playerRoadX < -0.35)
-    const isDogOnLeft = nearestDog.roadX < 0;
-    if (isDogOnLeft && playerRoadX > 0.35) {
-      const msg = 'QUÁ XA! LÁI SANG TRÁI ĐỂ MÓC!';
+    // Reason 3: Lane alignment check (Must match dog's lane!)
+    if (nearestDog.lane !== playerLane) {
+      const dirText = nearestDog.lane < playerLane ? 'TRÁI' : 'PHẢI';
+      const msg = `SAI LÀN! QUA ${dirText} ĐỂ MÓC!`;
       EventBus.emit(GAME_EVENTS.HOOK_FEEDBACK, { success: false, message: msg, reason: 'WRONG_SIDE' });
       return { success: false, message: msg, reason: 'WRONG_SIDE' };
     }
-    if (!isDogOnLeft && playerRoadX < -0.35) {
-      const msg = 'QUÁ XA! LÁI SANG PHẢI ĐỂ MÓC!';
+
+    // Reason 4: Transition check (player is in the process of moving into the lane)
+    if (Math.abs(playerRoadX - nearestDog.roadX) > 0.28) {
+      const msg = 'CHƯA VÀO ĐỦ LÀN!';
       EventBus.emit(GAME_EVENTS.HOOK_FEEDBACK, { success: false, message: msg, reason: 'WRONG_SIDE' });
       return { success: false, message: msg, reason: 'WRONG_SIDE' };
     }

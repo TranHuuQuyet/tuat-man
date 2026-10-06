@@ -1,11 +1,14 @@
 import Phaser from 'phaser';
-import { TUNING } from '../data/tuning';
+import { getLaneRoadX, getNearestLane, TUNING } from '../data/tuning';
+import type { Lane } from '../data/tuning';
 import { projectRoad } from '../utils/projection';
 
 export class PlayerBike {
   private container: Phaser.GameObjects.Container;
   private graphics: Phaser.GameObjects.Graphics;
 
+  public currentLane: Lane = 0;
+  public targetLane: Lane = 0;
   public roadX = 0;
   public z = TUNING.PLAYER_Z;
   public currentLean = 0;
@@ -30,13 +33,42 @@ export class PlayerBike {
     }
   }
 
-  public update(dt: number, steerInput: number): void {
-    this.roadX += steerInput * TUNING.PLAYER_STEER_SPEED * dt;
-    const maxRoadX = 0.85;
-    if (this.roadX < -maxRoadX) this.roadX = -maxRoadX;
-    if (this.roadX > maxRoadX) this.roadX = maxRoadX;
+  /**
+   * Switch lane by -1 (LEFT) or +1 (RIGHT).
+   * Clamped strictly to [-1, 1]. Returns true if target lane changed.
+   */
+  public moveLane(direction: -1 | 1): boolean {
+    if (direction === -1) {
+      if (this.targetLane > -1) {
+        this.targetLane = (this.targetLane - 1) as Lane;
+        return true;
+      }
+    } else if (direction === 1) {
+      if (this.targetLane < 1) {
+        this.targetLane = (this.targetLane + 1) as Lane;
+        return true;
+      }
+    }
+    return false;
+  }
 
-    const targetLean = steerInput * TUNING.PLAYER_LEAN_MAX_ANGLE;
+  public update(dt: number): void {
+    const targetRoadX = getLaneRoadX(this.targetLane);
+    const diffX = targetRoadX - this.roadX;
+
+    // Smooth lane transition interpolation
+    const lerpFactor = Math.min(1.0, dt * TUNING.LANE_SWITCH_SPEED);
+    this.roadX += diffX * lerpFactor;
+
+    // Update currentLane based on proximity
+    if (Math.abs(diffX) < 0.05) {
+      this.currentLane = this.targetLane;
+    } else {
+      this.currentLane = getNearestLane(this.roadX);
+    }
+
+    // Dynamic motorcycle lean angle during lane shift
+    const targetLean = Phaser.Math.Clamp(diffX * 1.8, -1, 1) * TUNING.PLAYER_LEAN_MAX_ANGLE;
     this.currentLean = Phaser.Math.Linear(this.currentLean, targetLean, TUNING.TILT_LERP);
 
     this.bounceTime += dt * 14;
