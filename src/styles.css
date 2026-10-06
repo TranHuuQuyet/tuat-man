@@ -315,17 +315,19 @@ body,
   transform: translate(-50%, -50%);
   pointer-events: none;
   z-index: 120;
-  animation: reward-burst 1.2s cubic-bezier(0.18, 0.89, 0.32, 1.28) forwards;
+  animation: reward-burst 1.4s cubic-bezier(0.18, 0.89, 0.32, 1.28) forwards;
 }
 
 .reward-popup-card {
   background: linear-gradient(135deg, rgba(28, 22, 58, 0.98) 0%, rgba(12, 10, 26, 0.98) 100%);
   border: 2px solid #ffd23f;
   border-radius: 18px;
-  padding: 16px 24px;
+  padding: 16px 28px;
   display: flex;
   flex-direction: column;
   align-items: center;
+  white-space: nowrap;
+  width: max-content;
   box-shadow: 0 0 35px rgba(255, 210, 63, 0.7);
 }
 
@@ -345,7 +347,7 @@ body,
 }
 
 @keyframes reward-burst {
-  0% { transform: translate(-50%, -40%) scale(0.7); opacity: 0; }
+  0% { transform: translate(-50%, -40%) scale(0.85); opacity: 1; }
   15% { transform: translate(-50%, -50%) scale(1.12); opacity: 1; }
   25% { transform: translate(-50%, -50%) scale(1.0); opacity: 1; }
   85% { transform: translate(-50%, -50%) scale(1.0); opacity: 1; }
