@@ -10,7 +10,10 @@ export class InputController {
   private keySpace: Phaser.Input.Keyboard.Key | null = null;
 
   private pendingLaneChange: -1 | 0 | 1 = 0;
+  private bufferedLaneChange: -1 | 0 | 1 = 0;
+  private bufferedTime = 0;
   private lastLaneChangeTime = 0;
+  private lastConsumedDirection: -1 | 0 | 1 = 0;
 
   // Swipe detection
   private touchStartX = 0;
@@ -71,10 +74,18 @@ export class InputController {
 
   public triggerLaneChange(direction: -1 | 1): void {
     const now = performance.now() / 1000;
-    if (now - this.lastLaneChangeTime < TUNING.LANE_SWITCH_COOLDOWN) {
+    // Immediate direction reversal: if player was moving left and taps right, execute immediately!
+    const isReversal = this.lastConsumedDirection !== 0 && this.lastConsumedDirection !== direction;
+
+    if (now - this.lastLaneChangeTime < TUNING.LANE_SWITCH_COOLDOWN && !isReversal) {
+      // Buffer input for up to 160ms so rapid consecutive taps aren't lost
+      this.bufferedLaneChange = direction;
+      this.bufferedTime = now;
       return;
     }
+
     this.pendingLaneChange = direction;
+    this.bufferedLaneChange = 0;
     this.lastLaneChangeTime = now;
   }
 
@@ -97,8 +108,22 @@ export class InputController {
       this.triggerLaneChange(1);
     }
 
-    const change = this.pendingLaneChange;
-    this.pendingLaneChange = 0;
+    let change: -1 | 0 | 1 = 0;
+    if (this.pendingLaneChange !== 0) {
+      change = this.pendingLaneChange;
+      this.pendingLaneChange = 0;
+    } else if (this.bufferedLaneChange !== 0) {
+      const now = performance.now() / 1000;
+      if (now - this.bufferedTime <= 0.16) {
+        change = this.bufferedLaneChange;
+        this.lastLaneChangeTime = now;
+      }
+      this.bufferedLaneChange = 0;
+    }
+
+    if (change !== 0) {
+      this.lastConsumedDirection = change;
+    }
     return change;
   }
 

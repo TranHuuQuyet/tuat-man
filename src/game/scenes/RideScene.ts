@@ -33,6 +33,7 @@ export interface TelemetryData {
   laneSwitches: number;
   leftSwitches: number;
   rightSwitches: number;
+  nearMisses: number;
   startTime: number;
   firstHookTime: number | null;
   firstCatchTime: number | null;
@@ -61,6 +62,10 @@ export class RideScene extends Phaser.Scene {
     distance: 0,
   };
 
+  private worldSpeed: number = TUNING.BASE_SPEED;
+  private runTime = 0;
+  private lastNearMissTime = 0;
+
   public telemetry: TelemetryData = {
     hookAttempts: 0,
     hookHits: 0,
@@ -76,6 +81,7 @@ export class RideScene extends Phaser.Scene {
     laneSwitches: 0,
     leftSwitches: 0,
     rightSwitches: 0,
+    nearMisses: 0,
     startTime: 0,
     firstHookTime: null,
     firstCatchTime: null,
@@ -101,9 +107,14 @@ export class RideScene extends Phaser.Scene {
     this.stats.distance = 0;
     this.currentState = 'RIDE';
 
+    this.worldSpeed = TUNING.BASE_SPEED;
+    this.runTime = 0;
+    this.lastNearMissTime = 0;
+
     this.telemetry.laneSwitches = 0;
     this.telemetry.leftSwitches = 0;
     this.telemetry.rightSwitches = 0;
+    this.telemetry.nearMisses = 0;
     this.telemetry.startTime = performance.now();
     (window as unknown as { __TUAT_TELEMETRY__: TelemetryData }).__TUAT_TELEMETRY__ = this.telemetry;
   }
@@ -256,15 +267,25 @@ export class RideScene extends Phaser.Scene {
       return;
     }
 
-    const speedMultiplier = this.currentState === 'PULLING' ? 0.55 : 1.0;
-    const currentSpeed = TUNING.BASE_SPEED * speedMultiplier;
+    // Progression: increment active run time during cruising and evaluate world speed ramp
+    if (this.currentState === 'RIDE') {
+      this.runTime += dt;
+    }
 
-    this.stats.distance += Math.round(18 * dt * speedMultiplier);
-    this.stats.score += Math.round(5 * dt * speedMultiplier);
+    const rampProgress = Math.min(1.0, this.runTime / TUNING.SPEED_RAMP_DURATION);
+    const targetCruisingSpeed = Phaser.Math.Linear(TUNING.BASE_SPEED, TUNING.MAX_WORLD_SPEED, rampProgress);
+
+    const targetSpeed = this.currentState === 'PULLING' ? targetCruisingSpeed * 0.55 : targetCruisingSpeed;
+    this.worldSpeed = Phaser.Math.Linear(this.worldSpeed, targetSpeed, Math.min(1.0, dt * 6.0));
+
+    const speedRatio = this.worldSpeed / TUNING.BASE_SPEED;
+
+    this.stats.distance += Math.round(18 * dt * speedRatio);
+    this.stats.score += Math.round(5 * dt * speedRatio);
     this.emitStats();
 
-    this.road.update(dt, speedMultiplier);
-    this.environment.update(dt, currentSpeed, this.player.currentLean);
+    this.road.update(dt, speedRatio);
+    this.environment.update(dt, this.worldSpeed, this.player.currentLean);
 
     const laneChange = this.inputCtrl.consumeLaneChange();
     if (laneChange !== 0) {
@@ -276,14 +297,15 @@ export class RideScene extends Phaser.Scene {
         } else {
           this.telemetry.rightSwitches++;
         }
+        this.camFx.onLaneChange(laneChange);
       }
     }
 
     this.player.update(dt);
-    this.camFx.steerTilt(this.player.currentLean);
+    this.camFx.update(dt, this.player.roadX, this.player.currentLean, speedRatio);
 
     // Dynamic engine throttle pitch and revving
-    SFX.updateEngine(speedMultiplier, Math.abs(this.player.currentLean) > 0.05);
+    SFX.updateEngine(speedRatio, Math.abs(this.player.currentLean) > 0.05);
 
     this.spawner.update(
       dt,
@@ -321,13 +343,33 @@ export class RideScene extends Phaser.Scene {
 
     // Update obstacles and collision check (transition-aware)
     const playerBounds = this.player.getScreenBounds();
+    const nowSec = performance.now() / 1000;
+
     for (let i = this.obstacles.length - 1; i >= 0; i--) {
       const obs = this.obstacles[i]!;
-      obs.update(dt, currentSpeed);
+      obs.update(dt, this.worldSpeed);
 
       if (obs.checkCollision(this.player.roadX, this.player.currentLane, this.player.targetLane, this.player.isChangingLane, playerBounds)) {
         this.handleCrash();
         return;
+      }
+
+      // Near-Miss detection (Section 20 - 24)
+      if (
+        obs.active &&
+        !obs.hasTriggeredNearMiss &&
+        this.currentState === 'RIDE' &&
+        obs.z >= 0.06 &&
+        obs.z <= 0.18
+      ) {
+        const latDist = Math.abs(this.player.roadX - obs.roadX);
+        // Adjacent lane brush or tight lateral dodge within 0.58 road units
+        if (latDist <= 0.58) {
+          obs.hasTriggeredNearMiss = true;
+          if (nowSec - this.lastNearMissTime >= 0.25) {
+            this.handleNearMiss(obs, nowSec);
+          }
+        }
       }
 
       if (!obs.active) {
@@ -339,7 +381,7 @@ export class RideScene extends Phaser.Scene {
     // Update dogs
     for (let i = this.dogs.length - 1; i >= 0; i--) {
       const dog = this.dogs[i]!;
-      dog.update(dt, currentSpeed);
+      dog.update(dt, this.worldSpeed);
 
       if (!dog.active && !dog.hooked) {
         this.spawner.recycleDog(dog);
@@ -462,6 +504,25 @@ export class RideScene extends Phaser.Scene {
     }, 900);
   }
 
+  private handleNearMiss(obs: ObstacleEntity, nowSec: number): void {
+    this.lastNearMissTime = nowSec;
+    this.telemetry.nearMisses++;
+    this.camFx.nearMissImpact();
+    SFX.playNearMiss();
+
+    const bonusPoints = 50;
+    this.stats.score += bonusPoints;
+    this.emitStats();
+
+    EventBus.emit(GAME_EVENTS.NEAR_MISS, {
+      hazardType: obs.type,
+      lane: obs.lane,
+      bonusPoints,
+    });
+
+    this.showFeedback('⚡ NÉ SÁT SẠT! +50', '#00f0ff');
+  }
+
   private restartGame(): void {
     this.cleanup();
     this.scene.restart({ playerName: this.stats.playerName });
@@ -526,5 +587,29 @@ export class RideScene extends Phaser.Scene {
 
   public getTelemetry(): TelemetryData {
     return this.telemetry;
+  }
+
+  public getWorldSpeed(): number {
+    return this.worldSpeed;
+  }
+
+  public setWorldSpeed(speed: number): void {
+    this.worldSpeed = speed;
+  }
+
+  public getRunTime(): number {
+    return this.runTime;
+  }
+
+  public setRunTime(time: number): void {
+    this.runTime = time;
+  }
+
+  public getCameraEffects(): CameraEffects {
+    return this.camFx;
+  }
+
+  public triggerNearMissForTest(obs: ObstacleEntity): void {
+    this.handleNearMiss(obs, performance.now() / 1000);
   }
 }

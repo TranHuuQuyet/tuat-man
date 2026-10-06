@@ -16,6 +16,7 @@ export class ObstacleEntity {
   public z: number;
   public type: HazardType;
   public active = true;
+  public hasTriggeredNearMiss = false;
 
   constructor(scene: Phaser.Scene, lane: Lane, z = 1.0, type: HazardType = 'barricade') {
     this.lane = lane;
@@ -44,6 +45,7 @@ export class ObstacleEntity {
     this.z = z;
     this.type = type;
     this.active = true;
+    this.hasTriggeredNearMiss = false;
     this.blinkPhase = Phaser.Math.FloatBetween(0, Math.PI * 2);
 
     this.container.setVisible(true);
@@ -56,6 +58,7 @@ export class ObstacleEntity {
    */
   public deactivate(): void {
     this.active = false;
+    this.hasTriggeredNearMiss = false;
     this.container.setVisible(false);
   }
 

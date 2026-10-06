@@ -39,18 +39,11 @@ export class PlayerBike {
    * Clamped strictly to [-1, 1]. Returns true if target lane changed.
    */
   public moveLane(direction: -1 | 1): boolean {
-    if (direction === -1) {
-      if (this.targetLane > -1) {
-        this.targetLane = (this.targetLane - 1) as Lane;
-        this.isChangingLane = true;
-        return true;
-      }
-    } else if (direction === 1) {
-      if (this.targetLane < 1) {
-        this.targetLane = (this.targetLane + 1) as Lane;
-        this.isChangingLane = true;
-        return true;
-      }
+    const nextLane = Phaser.Math.Clamp(this.targetLane + direction, -1, 1) as Lane;
+    if (nextLane !== this.targetLane) {
+      this.targetLane = nextLane;
+      this.isChangingLane = true;
+      return true;
     }
     return false;
   }
@@ -66,9 +59,10 @@ export class PlayerBike {
    * Set lane directly (for testing and resets).
    */
   public setLane(lane: Lane): void {
-    this.targetLane = lane;
-    this.currentLane = lane;
-    this.roadX = getLaneRoadX(lane);
+    const clampedLane = Phaser.Math.Clamp(lane, -1, 1) as Lane;
+    this.targetLane = clampedLane;
+    this.currentLane = clampedLane;
+    this.roadX = getLaneRoadX(clampedLane);
     this.isChangingLane = false;
     this.currentLean = 0;
     this.updatePosition();
@@ -78,12 +72,15 @@ export class PlayerBike {
     const targetRoadX = getLaneRoadX(this.targetLane);
     const diffX = targetRoadX - this.roadX;
 
-    // Smooth lane transition interpolation
+    // Smooth lane transition interpolation (~140ms snappy arrival)
     const lerpFactor = Math.min(1.0, dt * TUNING.LANE_SWITCH_SPEED);
     this.roadX += diffX * lerpFactor;
 
-    // Arrival tolerance: when player is within 0.05 road units, lane shift is complete
-    const ARRIVAL_TOLERANCE = 0.05;
+    // Strict boundary clamping to prevent accidental 4th lane visual drift
+    this.roadX = Phaser.Math.Clamp(this.roadX, TUNING.LANE_LEFT, TUNING.LANE_RIGHT);
+
+    // Arrival tolerance: when player is within 0.04 road units, lane shift is complete
+    const ARRIVAL_TOLERANCE = 0.04;
     if (Math.abs(diffX) < ARRIVAL_TOLERANCE) {
       this.roadX = targetRoadX;
       this.currentLane = this.targetLane;
@@ -93,8 +90,8 @@ export class PlayerBike {
     }
 
     // Dynamic motorcycle lean angle during lane shift
-    const targetLean = Phaser.Math.Clamp(diffX * 1.8, -1, 1) * TUNING.PLAYER_LEAN_MAX_ANGLE;
-    this.currentLean = Phaser.Math.Linear(this.currentLean, targetLean, TUNING.TILT_LERP);
+    const targetLean = Phaser.Math.Clamp(diffX * 2.2, -1, 1) * TUNING.PLAYER_LEAN_MAX_ANGLE;
+    this.currentLean = Phaser.Math.Linear(this.currentLean, targetLean, Math.min(1.0, dt * 14.0));
 
     this.bounceTime += dt * 14;
     const bounceOffset = Math.sin(this.bounceTime) * 1.5;

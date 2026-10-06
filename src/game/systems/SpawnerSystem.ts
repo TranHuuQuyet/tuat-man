@@ -193,6 +193,10 @@ export class SpawnerSystem {
     }
   }
 
+  public validateSpawnPattern(planOrHazards: SpawnPlan | SpawnPlanHazard[], maybeDogs?: SpawnPlanDog[]): boolean {
+    return validateSpawnPattern(planOrHazards, maybeDogs);
+  }
+
   public update(
     dt: number,
     isPulling: boolean,

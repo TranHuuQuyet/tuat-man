@@ -36,6 +36,12 @@ export interface RewardPopupData {
   type: 'dog' | 'money' | 'combo';
 }
 
+export interface NearMissData {
+  hazardType: string;
+  lane: number;
+  bonusPoints: number;
+}
+
 export type EventCallback<T = any> = (data: T) => void;
 
 class EventEmitter {
@@ -87,5 +93,6 @@ export const GAME_EVENTS = {
   REWARD_POPUP: 'REWARD_POPUP',
   AUDIO_MUTE_TOGGLE: 'AUDIO_MUTE_TOGGLE',
   GAME_OVER: 'GAME_OVER',
+  NEAR_MISS: 'NEAR_MISS',
 } as const;
 

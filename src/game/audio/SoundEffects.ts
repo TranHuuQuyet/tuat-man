@@ -477,6 +477,31 @@ class SoundEffectsManager {
   }
 
   /**
+   * Near miss whoosh / close dodge glint sound effect.
+   */
+  public playNearMiss(): void {
+    if (this.muted) return;
+    const ctx = this.initContext();
+    if (!ctx || !this.sfxGain) return;
+
+    const now = ctx.currentTime;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(580, now);
+    osc.frequency.exponentialRampToValueAtTime(1150, now + 0.11);
+
+    gain.gain.setValueAtTime(0.32, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
+
+    osc.connect(gain);
+    gain.connect(this.sfxGain);
+    osc.start(now);
+    osc.stop(now + 0.12);
+  }
+
+  /**
    * Crash collision crunch ("RẦM! XOẢNG!").
    */
   public playCrash(): void {
