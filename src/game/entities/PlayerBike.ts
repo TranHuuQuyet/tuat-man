@@ -62,6 +62,18 @@ export class PlayerBike {
     return !this.isChangingLane && this.currentLane === lane;
   }
 
+  /**
+   * Set lane directly (for testing and resets).
+   */
+  public setLane(lane: Lane): void {
+    this.targetLane = lane;
+    this.currentLane = lane;
+    this.roadX = getLaneRoadX(lane);
+    this.isChangingLane = false;
+    this.currentLean = 0;
+    this.updatePosition();
+  }
+
   public update(dt: number): void {
     const targetRoadX = getLaneRoadX(this.targetLane);
     const diffX = targetRoadX - this.roadX;

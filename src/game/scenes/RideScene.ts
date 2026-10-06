@@ -3,6 +3,7 @@ import { SFX } from '../audio/SoundEffects';
 import { DEFAULT_DOG } from '../data/dogs';
 import { TUNING } from '../data/tuning';
 import type { Lane } from '../data/tuning';
+import type { HazardType } from '../data/trafficTypes';
 import { CameraEffects } from '../effects/CameraEffects';
 import { DogEntity } from '../entities/DogEntity';
 import { EnvironmentManager } from '../entities/EnvironmentManager';
@@ -329,7 +330,7 @@ export class RideScene extends Phaser.Scene {
       }
 
       if (!obs.active) {
-        obs.destroy();
+        this.spawner.recycleObstacle(obs);
         this.obstacles.splice(i, 1);
       }
     }
@@ -464,7 +465,7 @@ export class RideScene extends Phaser.Scene {
     SFX.stopBgm();
     this.unsubscribers.forEach((unsub) => unsub());
     this.unsubscribers = [];
-    this.obstacles.forEach((o) => o.destroy());
+    this.obstacles.forEach((o) => this.spawner.recycleObstacle(o));
     this.obstacles = [];
     this.dogs.forEach((d) => d.destroy());
     this.dogs = [];
@@ -479,8 +480,16 @@ export class RideScene extends Phaser.Scene {
   }
 
   // --- Test & Inspection Helpers ---
+  public setStateForTest(state: GameState): void {
+    this.changeState(state);
+  }
+
   public getEnvironment(): EnvironmentManager {
     return this.environment;
+  }
+
+  public getSpawner(): SpawnerSystem {
+    return this.spawner;
   }
 
   public getPlayer(): PlayerBike {
@@ -495,8 +504,8 @@ export class RideScene extends Phaser.Scene {
     return this.obstacles;
   }
 
-  public spawnTestObstacle(lane: Lane, z: number): ObstacleEntity {
-    const obs = new ObstacleEntity(this, lane, z);
+  public spawnTestObstacle(lane: Lane, z: number, type: HazardType = 'barricade'): ObstacleEntity {
+    const obs = this.spawner.acquireObstacle(lane, z, type);
     this.obstacles.push(obs);
     return obs;
   }
