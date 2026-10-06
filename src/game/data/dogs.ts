@@ -15,15 +15,24 @@ export interface DogConfig {
   name: string;
   speedFactor: number;        // Speed multiplier against base road speed
   targetSize: number;         // Lateral hitbox / hook alignment multiplier
-  pullDifficulty: number;     // Pull resistance multiplier (1.00 - 1.30)
+  /** Documented relative difficulty factor for display / telemetry (1.00 - 1.30) */
+  pullDifficulty: number;
+  /** Authoritative runtime pull resistance power drain rate per second */
+  pullResistance: number;
   reward: number;             // Cash reward ($150, $200, $250, $500)
   score: number;              // Score bonus (500, 750, 1000, 2000)
   rarityWeight: number;       // Spawn probability weight (60, 25, 10, 5)
   hookMinZ: number;
   hookMaxZ: number;
-  pullResistance: number;
   pullRequiredPower: number;
   pullTimeLimit: number;
+}
+
+/**
+ * Calculates authoritative runtime pull resistance from base difficulty factor.
+ */
+export function calculatePullResistance(difficulty: number): number {
+  return TUNING.PULL_RESISTANCE_BASE * difficulty;
 }
 
 export const DOG_CONFIGS: Record<DogType, DogConfig> = {

@@ -41,13 +41,50 @@ export interface SpawnPlanDog {
   type: DogType;
 }
 
+export interface SpawnPlanEntry {
+  kind: 'dog' | 'obstacle';
+  lane: Lane;
+  z: number;
+  dogType?: DogType;
+  hazardType?: HazardType;
+}
+
+export interface SpawnPlan {
+  pattern: SpawnPattern;
+  hazards: SpawnPlanHazard[];
+  dogs: SpawnPlanDog[];
+}
+
+export interface SpawnOverrides {
+  dogLane?: Lane;
+  obstacleLane?: Lane;
+  z?: number;
+  dogZ?: number;
+  obstacleZ?: number;
+  hazardType?: HazardType;
+  dogType?: DogType;
+}
+
 /**
- * Validates spawn pattern plans against Section 16 fairness rules.
+ * Validates planned spawn data against Section 16 fairness rules before pool acquisition.
+ * Pure validation with zero side-effects.
  */
 export function validateSpawnPattern(
-  hazards: SpawnPlanHazard[],
-  dogs: SpawnPlanDog[],
+  planOrHazards: SpawnPlan | SpawnPlanHazard[],
+  maybeDogs?: SpawnPlanDog[],
+  _playerLane?: Lane,
 ): boolean {
+  let hazards: SpawnPlanHazard[];
+  let dogs: SpawnPlanDog[];
+
+  if ('hazards' in planOrHazards && 'dogs' in planOrHazards) {
+    hazards = planOrHazards.hazards;
+    dogs = planOrHazards.dogs;
+  } else {
+    hazards = planOrHazards as SpawnPlanHazard[];
+    dogs = (maybeDogs ?? []) as SpawnPlanDog[];
+  }
+
   // Rule A: Minimum reaction distance on spawn (z >= 0.50)
   for (const h of hazards) {
     if (h.z < 0.50) return false;
@@ -56,7 +93,7 @@ export function validateSpawnPattern(
     if (d.z < 0.50) return false;
   }
 
-  // Rule B: Never block all 3 lanes at the same collision depth window (|z1 - z2| < 0.16)
+  // Rule B: Three-lane fairness (never block all 3 lanes at the same collision depth window |z1 - z2| < 0.16)
   for (const h1 of hazards) {
     const overlapping = hazards.filter((h2) => Math.abs(h1.z - h2.z) < 0.16);
     const blockedLanes = new Set(overlapping.map((h) => h.lane));
@@ -65,7 +102,7 @@ export function validateSpawnPattern(
     }
   }
 
-  // Rule C: Dog and solid hazard must NEVER be at the same lane + same depth window
+  // Rule C: Dog and solid hazard must NEVER be at the same lane + same depth window (separation >= 0.20)
   for (const dog of dogs) {
     for (const h of hazards) {
       if (dog.lane === h.lane && Math.abs(dog.z - h.z) < 0.20) {
@@ -74,7 +111,16 @@ export function validateSpawnPattern(
     }
   }
 
-  // Rule D: If multiple dogs are spawned, they must not be bunched at identical depths
+  // Rule D: Dog reachability - ensure dog's lane is not blocked directly in front of the dog
+  for (const dog of dogs) {
+    for (const h of hazards) {
+      if (dog.lane === h.lane && h.z < dog.z && dog.z - h.z < 0.25) {
+        return false; // Hazard placed too close ahead of dog in same lane!
+      }
+    }
+  }
+
+  // Rule E: No impossible simultaneous dog targets (multiple dogs must be separated by >= 0.18 in depth)
   for (let i = 0; i < dogs.length; i++) {
     for (let j = i + 1; j < dogs.length; j++) {
       if (Math.abs(dogs[i]!.z - dogs[j]!.z) < 0.18) {
@@ -92,8 +138,8 @@ export class SpawnerSystem {
   private lastObstacleLane: Lane = 0;
   private isFirstWave = true;
 
-  private obstaclePool: ObstacleEntity[] = [];
-  private dogPool: DogEntity[] = [];
+  public obstaclePool: ObstacleEntity[] = [];
+  public dogPool: DogEntity[] = [];
 
   constructor(scene: Phaser.Scene) {
     this.scene = scene;
@@ -200,21 +246,16 @@ export class SpawnerSystem {
     }
   }
 
-  public spawnPattern(
+  /**
+   * Pure function: builds a plan representation before acquiring pooled entities.
+   */
+  public buildSpawnPlan(
     pattern: SpawnPattern,
-    onSpawnObstacle: (obs: ObstacleEntity) => void,
-    onSpawnDog: (dog: DogEntity) => void,
-    overrides?: {
-      dogLane?: Lane;
-      obstacleLane?: Lane;
-      z?: number;
-      dogZ?: number;
-      obstacleZ?: number;
-      hazardType?: HazardType;
-      dogType?: DogType;
-    },
-  ): void {
+    overrides?: SpawnOverrides,
+  ): SpawnPlan {
     const baseZ = overrides?.z ?? 1.0;
+    const hazards: SpawnPlanHazard[] = [];
+    const dogs: SpawnPlanDog[] = [];
 
     switch (pattern) {
       // --- PATTERN A: SINGLE TRAFFIC ---
@@ -222,11 +263,9 @@ export class SpawnerSystem {
       case 'SINGLE_OBSTACLE': {
         const availableLanes = LANES.filter((l) => l !== this.lastObstacleLane);
         const lane = overrides?.obstacleLane ?? availableLanes[Phaser.Math.Between(0, availableLanes.length - 1)]!;
-        this.lastObstacleLane = lane;
         const obsZ = overrides?.obstacleZ ?? baseZ;
         const type = overrides?.hazardType ?? this.pickRandomTrafficOrObstacle();
-        const obs = this.acquireObstacle(lane, obsZ, type);
-        onSpawnObstacle(obs);
+        hazards.push({ lane, z: obsZ, type });
         break;
       }
 
@@ -237,11 +276,8 @@ export class SpawnerSystem {
         const obsZ = overrides?.obstacleZ ?? baseZ;
         const type1 = this.pickRandomObstacleType();
         const type2 = this.pickRandomTrafficType();
-
-        const obs1 = this.acquireObstacle(blockedLanes[0]!, obsZ, type1);
-        const obs2 = this.acquireObstacle(blockedLanes[1]!, obsZ, type2);
-        onSpawnObstacle(obs1);
-        onSpawnObstacle(obs2);
+        hazards.push({ lane: blockedLanes[0]!, z: obsZ, type: type1 });
+        hazards.push({ lane: blockedLanes[1]!, z: obsZ, type: type2 });
         break;
       }
 
@@ -251,8 +287,7 @@ export class SpawnerSystem {
         const lane = overrides?.dogLane ?? LANES[Phaser.Math.Between(0, LANES.length - 1)]!;
         const dogZ = overrides?.dogZ ?? baseZ;
         const dogType = overrides?.dogType ?? pickRandomDogType();
-        const dog = this.acquireDog(DOG_CONFIGS[dogType], lane, dogZ);
-        onSpawnDog(dog);
+        dogs.push({ lane, z: dogZ, type: dogType });
         break;
       }
 
@@ -263,19 +298,12 @@ export class SpawnerSystem {
         const availableObstacleLanes = LANES.filter((l) => l !== dogLane);
         const obstacleLane: Lane = overrides?.obstacleLane ??
           availableObstacleLanes[Phaser.Math.Between(0, availableObstacleLanes.length - 1)]!;
-
-        this.lastObstacleLane = obstacleLane;
-
         const obsZ = overrides?.obstacleZ ?? Math.max(0.72, baseZ - 0.24);
         const dogZ = overrides?.dogZ ?? (baseZ > 0.95 ? 1.02 : baseZ);
         const type = overrides?.hazardType ?? this.pickRandomTrafficType();
         const dogType = overrides?.dogType ?? pickRandomDogType();
-
-        const dog = this.acquireDog(DOG_CONFIGS[dogType], dogLane, dogZ);
-        const obs = this.acquireObstacle(obstacleLane, obsZ, type);
-
-        onSpawnDog(dog);
-        onSpawnObstacle(obs);
+        dogs.push({ lane: dogLane, z: dogZ, type: dogType });
+        hazards.push({ lane: obstacleLane, z: obsZ, type });
         break;
       }
 
@@ -284,19 +312,14 @@ export class SpawnerSystem {
         const dogLane: Lane = overrides?.dogLane ?? 0;
         const dogZ = overrides?.dogZ ?? (baseZ > 0.95 ? 1.02 : baseZ);
         const dogType = overrides?.dogType ?? pickRandomDogType();
-        const dog = this.acquireDog(DOG_CONFIGS[dogType], dogLane, dogZ);
-        onSpawnDog(dog);
+        dogs.push({ lane: dogLane, z: dogZ, type: dogType });
 
         const blockedLanes = LANES.filter((l) => l !== dogLane);
         const obsZ = overrides?.obstacleZ ?? Math.max(0.72, baseZ - 0.26);
-
         const type1 = this.pickRandomObstacleType();
         const type2 = this.pickRandomTrafficType();
-
-        const obs1 = this.acquireObstacle(blockedLanes[0]!, obsZ, type1);
-        const obs2 = this.acquireObstacle(blockedLanes[1]!, obsZ, type2);
-        onSpawnObstacle(obs1);
-        onSpawnObstacle(obs2);
+        hazards.push({ lane: blockedLanes[0]!, z: obsZ, type: type1 });
+        hazards.push({ lane: blockedLanes[1]!, z: obsZ, type: type2 });
         break;
       }
 
@@ -305,19 +328,12 @@ export class SpawnerSystem {
         const lane1: Lane = LANES[Phaser.Math.Between(0, LANES.length - 1)]!;
         const remainingLanes = LANES.filter((l) => l !== lane1);
         const lane2: Lane = remainingLanes[Phaser.Math.Between(0, remainingLanes.length - 1)]!;
-
-        this.lastObstacleLane = lane2;
-
         const obsZ1 = Math.max(0.72, baseZ - 0.26);
         const obsZ2 = baseZ;
-
         const type1 = this.pickRandomTrafficType();
         const type2 = this.pickRandomTrafficOrObstacle();
-
-        const obs1 = this.acquireObstacle(lane1, obsZ1, type1);
-        const obs2 = this.acquireObstacle(lane2, obsZ2, type2);
-        onSpawnObstacle(obs1);
-        onSpawnObstacle(obs2);
+        hazards.push({ lane: lane1, z: obsZ1, type: type1 });
+        hazards.push({ lane: lane2, z: obsZ2, type: type2 });
         break;
       }
 
@@ -325,8 +341,8 @@ export class SpawnerSystem {
       case 'RARE_DOG': {
         const lane = overrides?.dogLane ?? 0;
         const dogZ = overrides?.dogZ ?? baseZ;
-        const dog = this.acquireDog(DOG_CONFIGS.phu_quoc, lane, dogZ);
-        onSpawnDog(dog);
+        const dogType = overrides?.dogType ?? 'phu_quoc';
+        dogs.push({ lane, z: dogZ, type: dogType });
         break;
       }
 
@@ -334,14 +350,10 @@ export class SpawnerSystem {
       case 'DOG_CHOICE': {
         const lane1: Lane = overrides?.dogLane ?? -1;
         const lane2: Lane = overrides?.obstacleLane ?? 1;
-
         const dogZ1 = Math.max(0.68, baseZ - 0.26);
         const dogZ2 = baseZ > 0.95 ? 1.02 : baseZ;
-
-        const dog1 = this.acquireDog(DOG_CONFIGS.grass_dog, lane1, dogZ1);
-        const dog2 = this.acquireDog(DOG_CONFIGS.golden_dog, lane2, dogZ2);
-        onSpawnDog(dog1);
-        onSpawnDog(dog2);
+        dogs.push({ lane: lane1, z: dogZ1, type: 'grass_dog' });
+        dogs.push({ lane: lane2, z: dogZ2, type: 'golden_dog' });
         break;
       }
 
@@ -350,46 +362,92 @@ export class SpawnerSystem {
         const dogLane: Lane = overrides?.dogLane ?? 0;
         const dogZ = overrides?.dogZ ?? (baseZ > 0.95 ? 1.02 : baseZ);
         const dogType = overrides?.dogType ?? pickRandomDogType();
-        const dog = this.acquireDog(DOG_CONFIGS[dogType], dogLane, dogZ);
-        onSpawnDog(dog);
-
-        // Flanking lanes: 1 obstacle at z = 0.72, 1 traffic at z = 0.88
-        const obs = this.acquireObstacle(-1, Math.max(0.70, baseZ - 0.28), 'barricade');
-        const traffic = this.acquireObstacle(1, Math.max(0.85, baseZ - 0.12), 'taxi');
-        onSpawnObstacle(obs);
-        onSpawnObstacle(traffic);
+        dogs.push({ lane: dogLane, z: dogZ, type: dogType });
+        hazards.push({ lane: -1, z: Math.max(0.70, baseZ - 0.28), type: 'barricade' });
+        hazards.push({ lane: 1, z: Math.max(0.85, baseZ - 0.12), type: 'taxi' });
         break;
       }
 
       // --- PATTERN J: RARE DOG + PRESSURE ---
       case 'RARE_DOG_PRESSURE': {
-        const dog = this.acquireDog(DOG_CONFIGS.phu_quoc, 0, baseZ > 0.95 ? 1.02 : baseZ);
-        onSpawnDog(dog);
-
-        const obs1 = this.acquireObstacle(-1, Math.max(0.72, baseZ - 0.26), 'boxes');
-        const obs2 = this.acquireObstacle(1, Math.max(0.72, baseZ - 0.26), 'delivery_truck');
-        onSpawnObstacle(obs1);
-        onSpawnObstacle(obs2);
+        const dogZ = overrides?.dogZ ?? (baseZ > 0.95 ? 1.02 : baseZ);
+        dogs.push({ lane: 0, z: dogZ, type: 'phu_quoc' });
+        hazards.push({ lane: -1, z: Math.max(0.72, baseZ - 0.26), type: 'boxes' });
+        hazards.push({ lane: 1, z: Math.max(0.72, baseZ - 0.26), type: 'delivery_truck' });
         break;
       }
 
       // --- PATTERN K: DOG SEQUENCE ---
       case 'DOG_SEQUENCE': {
-        // Forward planning: Obstacle in Lane 1, Dog 1 in Lane 2, Dog 2 in Lane 3
         const obsZ = Math.max(0.60, baseZ - 0.38);
         const dog1Z = Math.max(0.80, baseZ - 0.18);
         const dog2Z = baseZ > 0.95 ? 1.04 : baseZ;
-
-        const obs = this.acquireObstacle(-1, obsZ, 'pothole');
-        const dog1 = this.acquireDog(DOG_CONFIGS.grass_dog, 0, dog1Z);
-        const dog2 = this.acquireDog(DOG_CONFIGS.golden_dog, 1, dog2Z);
-
-        onSpawnObstacle(obs);
-        onSpawnDog(dog1);
-        onSpawnDog(dog2);
+        hazards.push({ lane: -1, z: obsZ, type: 'pothole' });
+        dogs.push({ lane: 0, z: dog1Z, type: 'grass_dog' });
+        dogs.push({ lane: 1, z: dog2Z, type: 'golden_dog' });
         break;
       }
     }
+
+    return { pattern, hazards, dogs };
+  }
+
+  /**
+   * Executes a validated plan by acquiring pooled objects and dispatching spawn callbacks.
+   */
+  public executeSpawnPlan(
+    plan: SpawnPlan,
+    onSpawnObstacle: (obs: ObstacleEntity) => void,
+    onSpawnDog: (dog: DogEntity) => void,
+  ): void {
+    for (const h of plan.hazards) {
+      const obs = this.acquireObstacle(h.lane, h.z, h.type);
+      this.lastObstacleLane = h.lane;
+      onSpawnObstacle(obs);
+    }
+    for (const d of plan.dogs) {
+      const config = DOG_CONFIGS[d.type];
+      const dog = this.acquireDog(config, d.lane, d.z);
+      onSpawnDog(dog);
+    }
+  }
+
+  /**
+   * End-to-end spawn pipeline:
+   * Pattern -> Build Plan -> Validate Plan -> If valid: Acquire & Spawn -> If invalid: Fallback
+   */
+  public spawnPattern(
+    pattern: SpawnPattern,
+    onSpawnObstacle: (obs: ObstacleEntity) => void,
+    onSpawnDog: (dog: DogEntity) => void,
+    overrides?: SpawnOverrides,
+  ): SpawnPlan {
+    let plan = this.buildSpawnPlan(pattern, overrides);
+
+    // Strictly enforce validation before acquiring any pooled entities
+    if (!validateSpawnPattern(plan)) {
+      // Safe fallback order: invalid advanced pattern -> SINGLE_DOG -> SINGLE_TRAFFIC
+      const fallbackPattern: SpawnPattern = plan.dogs.length > 0 ? 'SINGLE_DOG' : 'SINGLE_TRAFFIC';
+      let fallbackPlan = this.buildSpawnPlan(fallbackPattern, { z: Math.max(0.70, overrides?.z ?? 1.0) });
+
+      if (!validateSpawnPattern(fallbackPlan)) {
+        fallbackPlan = this.buildSpawnPlan('SINGLE_TRAFFIC', { z: Math.max(0.70, overrides?.z ?? 1.0) });
+      }
+
+      if (validateSpawnPattern(fallbackPlan)) {
+        plan = fallbackPlan;
+      } else {
+        // Guaranteed safe minimal plan
+        plan = {
+          pattern: 'SINGLE_TRAFFIC',
+          hazards: [{ lane: 0, z: Math.max(0.70, overrides?.z ?? 1.0), type: 'motorbike' }],
+          dogs: [],
+        };
+      }
+    }
+
+    this.executeSpawnPlan(plan, onSpawnObstacle, onSpawnDog);
+    return plan;
   }
 
   public pickRandomTrafficType(): TrafficType {
