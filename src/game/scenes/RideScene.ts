@@ -5,6 +5,7 @@ import { TUNING } from '../data/tuning';
 import type { Lane } from '../data/tuning';
 import { CameraEffects } from '../effects/CameraEffects';
 import { DogEntity } from '../entities/DogEntity';
+import { EnvironmentManager } from '../entities/EnvironmentManager';
 import { ObstacleEntity } from '../entities/ObstacleEntity';
 import { PlayerBike } from '../entities/PlayerBike';
 import { RoadRenderer } from '../entities/RoadRenderer';
@@ -37,6 +38,7 @@ export interface TelemetryData {
 
 export class RideScene extends Phaser.Scene {
   private road!: RoadRenderer;
+  private environment!: EnvironmentManager;
   private player!: PlayerBike;
   private inputCtrl!: InputController;
   private spawner!: SpawnerSystem;
@@ -106,6 +108,7 @@ export class RideScene extends Phaser.Scene {
 
   create(): void {
     this.camFx = new CameraEffects(this);
+    this.environment = new EnvironmentManager(this);
     this.road = new RoadRenderer(this);
     this.player = new PlayerBike(this);
     this.inputCtrl = new InputController(this);
@@ -259,6 +262,7 @@ export class RideScene extends Phaser.Scene {
     this.emitStats();
 
     this.road.update(dt, speedMultiplier);
+    this.environment.update(dt, currentSpeed, this.player.currentLean);
 
     const laneChange = this.inputCtrl.consumeLaneChange();
     if (laneChange !== 0) {
@@ -464,6 +468,7 @@ export class RideScene extends Phaser.Scene {
     this.obstacles = [];
     this.dogs.forEach((d) => d.destroy());
     this.dogs = [];
+    this.environment.destroy();
     this.ropeGraphics.clear();
     this.inputCtrl.destroy();
     this.camFx.reset();
@@ -474,6 +479,10 @@ export class RideScene extends Phaser.Scene {
   }
 
   // --- Test & Inspection Helpers ---
+  public getEnvironment(): EnvironmentManager {
+    return this.environment;
+  }
+
   public getPlayer(): PlayerBike {
     return this.player;
   }

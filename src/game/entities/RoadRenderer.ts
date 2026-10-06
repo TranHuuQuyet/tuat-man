@@ -21,18 +21,8 @@ export class RoadRenderer {
     this.graphics.clear();
     const horizonY = TUNING.HORIZON_Y;
 
-    // Dark sky backdrop
-    this.graphics.fillStyle(0x0a0914, 1);
-    this.graphics.fillRect(0, 0, GAME_WIDTH, horizonY);
-
-    // City glow on horizon
-    this.graphics.fillStyle(0x19142b, 1);
-    this.graphics.fillRect(0, horizonY - 45, GAME_WIDTH, 45);
-    this.graphics.fillStyle(0x2d1a3a, 0.5);
-    this.graphics.fillRect(0, horizonY - 15, GAME_WIDTH, 15);
-
-    // Ground / terrain outside road
-    this.graphics.fillStyle(0x0f0e1a, 1);
+    // Ground terrain base below horizon
+    this.graphics.fillStyle(0x0e0d18, 1);
     this.graphics.fillRect(0, horizonY, GAME_WIDTH, GAME_HEIGHT - horizonY);
 
     // Perspective asphalt segments with alternating shades for speed feel
@@ -51,11 +41,49 @@ export class RoadRenderer {
       const curbWidthNear = pNear.roadWidth * 0.085;
       const curbWidthFar = pFar.roadWidth * 0.085;
 
+      const curbLeftOuterNear = pNear.x - pNear.roadWidth / 2 - curbWidthNear;
+      const curbLeftOuterFar = pFar.x - pFar.roadWidth / 2 - curbWidthFar;
+      const curbRightOuterNear = pNear.x + pNear.roadWidth / 2 + curbWidthNear;
+      const curbRightOuterFar = pFar.x + pFar.roadWidth / 2 + curbWidthFar;
+
+      // 1. Vietnamese Sidewalks (Vỉa hè lát gạch hai bên đường)
+      const pNearSwL = projectRoad(-2.2, zNear);
+      const pFarSwL = projectRoad(-2.2, zFar);
+      const pNearSwR = projectRoad(2.2, zNear);
+      const pFarSwR = projectRoad(2.2, zFar);
+
+      const swTileColor = (Math.floor(zNear * 8 + this.stripeOffset * 4) % 2 === 0) ? 0x2b2838 : 0x242030;
+      this.graphics.fillStyle(swTileColor, 1);
+
+      // Left Sidewalk polygon
+      this.graphics.fillPoints([
+        { x: pNearSwL.x, y: pNearSwL.y },
+        { x: pFarSwL.x, y: pFarSwL.y },
+        { x: curbLeftOuterFar, y: pFar.y },
+        { x: curbLeftOuterNear, y: pNear.y },
+      ]);
+
+      // Right Sidewalk polygon
+      this.graphics.fillPoints([
+        { x: curbRightOuterNear, y: pNear.y },
+        { x: curbRightOuterFar, y: pFar.y },
+        { x: pFarSwR.x, y: pFarSwR.y },
+        { x: pNearSwR.x, y: pNearSwR.y },
+      ]);
+
+      // Sidewalk longitudinal divider seam line
+      this.graphics.fillStyle(0x191624, 0.7);
+      const pNearSwMidL = projectRoad(-1.55, zNear);
+      this.graphics.fillRect(pNearSwMidL.x - 1, pNearSwMidL.y, 2, pNear.scale * 4);
+      const pNearSwMidR = projectRoad(1.55, zNear);
+      this.graphics.fillRect(pNearSwMidR.x - 1, pNearSwMidR.y, 2, pNear.scale * 4);
+
+      // 2. Red & White Curbs (Bờ kè vỉa hè)
       // Left Curb
       this.graphics.fillStyle(curbColor, 0.95);
       this.graphics.fillPoints([
-        { x: pNear.x - pNear.roadWidth / 2 - curbWidthNear, y: pNear.y },
-        { x: pFar.x - pFar.roadWidth / 2 - curbWidthFar, y: pFar.y },
+        { x: curbLeftOuterNear, y: pNear.y },
+        { x: curbLeftOuterFar, y: pFar.y },
         { x: pFar.x - pFar.roadWidth / 2, y: pFar.y },
         { x: pNear.x - pNear.roadWidth / 2, y: pNear.y },
       ]);
@@ -64,8 +92,8 @@ export class RoadRenderer {
       this.graphics.fillPoints([
         { x: pNear.x + pNear.roadWidth / 2, y: pNear.y },
         { x: pFar.x + pFar.roadWidth / 2, y: pFar.y },
-        { x: pFar.x + pFar.roadWidth / 2 + curbWidthFar, y: pFar.y },
-        { x: pNear.x + pNear.roadWidth / 2 + curbWidthNear, y: pNear.y },
+        { x: curbRightOuterFar, y: pFar.y },
+        { x: curbRightOuterNear, y: pNear.y },
       ]);
 
       // 3 Distinct Lane Corridors: Draw Left, Center, and Right lanes with subtle alternating asphalt shades
