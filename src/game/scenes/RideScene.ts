@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { SFX } from '../audio/SoundEffects';
-import { DEFAULT_DOG } from '../data/dogs';
+import { getDogConfig } from '../data/dogs';
+import type { DogType } from '../data/dogs';
 import { TUNING } from '../data/tuning';
 import type { Lane } from '../data/tuning';
 import type { HazardType } from '../data/trafficTypes';
@@ -341,7 +342,7 @@ export class RideScene extends Phaser.Scene {
       dog.update(dt, currentSpeed);
 
       if (!dog.active && !dog.hooked) {
-        dog.destroy();
+        this.spawner.recycleDog(dog);
         this.dogs.splice(i, 1);
       }
     }
@@ -392,24 +393,30 @@ export class RideScene extends Phaser.Scene {
 
     this.ropeGraphics.clear();
     this.camFx.catchImpact();
-    this.showFeedback('🎉 BẮT ĐƯỢC CHÓ! +$150', '#00ff88');
+
+    const hookedIndex = this.dogs.findIndex((d) => d.hooked);
+    const hookedDog = hookedIndex !== -1 ? this.dogs[hookedIndex]! : null;
+    const rewardValue = hookedDog ? hookedDog.config.reward : 150;
+    const dogName = hookedDog ? hookedDog.config.name : 'Chó Cỏ';
+    const scoreValue = hookedDog ? hookedDog.config.score : 500;
+
+    this.showFeedback(`🎉 BẮT ĐƯỢC ${dogName.toUpperCase()}! +$${rewardValue}`, '#00ff88');
 
     // Trigger WOW reward popup in HUD
     EventBus.emit(GAME_EVENTS.REWARD_POPUP, {
-      text: '🎉 BẮT ĐƯỢC CHÓ!',
-      subtext: '+$150 VÀO TÚI 💵',
-      amount: 150,
+      text: `🎉 BẮT ĐƯỢC ${dogName.toUpperCase()}!`,
+      subtext: `+$${rewardValue} VÀO TÚI 💵`,
+      amount: rewardValue,
       type: 'dog',
     });
 
     this.stats.dogCount += 1;
-    this.stats.money += 150;
-    this.stats.score += 500;
+    this.stats.money += rewardValue;
+    this.stats.score += scoreValue;
     this.emitStats();
 
-    const hookedIndex = this.dogs.findIndex((d) => d.hooked);
-    if (hookedIndex !== -1) {
-      this.dogs[hookedIndex]!.destroy();
+    if (hookedDog) {
+      this.spawner.recycleDog(hookedDog);
       this.dogs.splice(hookedIndex, 1);
     }
 
@@ -467,7 +474,7 @@ export class RideScene extends Phaser.Scene {
     this.unsubscribers = [];
     this.obstacles.forEach((o) => this.spawner.recycleObstacle(o));
     this.obstacles = [];
-    this.dogs.forEach((d) => d.destroy());
+    this.dogs.forEach((d) => this.spawner.recycleDog(d));
     this.dogs = [];
     this.environment.destroy();
     this.ropeGraphics.clear();
@@ -510,8 +517,9 @@ export class RideScene extends Phaser.Scene {
     return obs;
   }
 
-  public spawnTestDog(lane: Lane, z: number): DogEntity {
-    const dog = new DogEntity(this, DEFAULT_DOG, lane, z);
+  public spawnTestDog(lane: Lane, z: number, type: DogType = 'grass_dog'): DogEntity {
+    const config = getDogConfig(type);
+    const dog = this.spawner.acquireDog(config, lane, z);
     this.dogs.push(dog);
     return dog;
   }

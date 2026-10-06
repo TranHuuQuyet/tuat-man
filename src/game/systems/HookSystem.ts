@@ -40,8 +40,10 @@ export class HookSystem {
       sameLaneHookable.sort((a, b) => a.z - b.z);
       const targetDog = sameLaneHookable[0]!;
 
-      // Transition check: ensure player is physically aligned with the lane
-      if (Math.abs(playerRoadX - targetDog.roadX) > 0.22) {
+      // Transition check: ensure player is physically aligned with the lane (scaled by dog targetSize)
+      const targetSize = targetDog.config.targetSize ?? 1.0;
+      const maxOffset = 0.22 * targetSize;
+      if (Math.abs(playerRoadX - targetDog.roadX) > maxOffset) {
         const msg = 'CHƯA VÀO ĐỦ LÀN!';
         EventBus.emit(GAME_EVENTS.HOOK_FEEDBACK, { success: false, message: msg, reason: 'WRONG_SIDE' });
         return { success: false, message: msg, reason: 'WRONG_SIDE' };
