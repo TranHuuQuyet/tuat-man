@@ -191,7 +191,7 @@ export class RideScene extends Phaser.Scene {
     this.telemetry.hookAttempts++;
     SFX.playHookThrow();
 
-    const res = this.hookSys.attemptHook(this.dogs, this.player.targetLane, this.player.roadX, this.time.now / 1000);
+    const res = this.hookSys.attemptHook(this.dogs, this.player.currentLane, this.player.roadX, this.time.now / 1000);
 
     if (res.success && res.dog) {
       this.telemetry.hookHits++;

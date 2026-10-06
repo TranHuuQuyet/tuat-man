@@ -56,10 +56,10 @@ export class PlayerBike {
   }
 
   /**
-   * Check if player is settled within tolerance of a specific lane.
+   * Check if player is settled in a specific lane (not transitioning).
    */
-  public isSettledInLane(lane: Lane, tolerance = 0.16): boolean {
-    return Math.abs(this.roadX - getLaneRoadX(lane)) <= tolerance;
+  public isSettledInLane(lane: Lane): boolean {
+    return !this.isChangingLane && this.currentLane === lane;
   }
 
   public update(dt: number): void {
@@ -78,10 +78,6 @@ export class PlayerBike {
       this.isChangingLane = false;
     } else {
       this.isChangingLane = true;
-      // In transition, if player has moved substantially into target lane (within 0.14)
-      if (Math.abs(diffX) <= 0.14) {
-        this.currentLane = this.targetLane;
-      }
     }
 
     // Dynamic motorcycle lean angle during lane shift
