@@ -101,38 +101,57 @@ export class ObstacleEntity {
   }
 
   public checkCollision(
-    playerLane: Lane,
-    playerRoadX: number,
-    playerScreenBounds?: { x: number; y: number; radiusX: number; radiusY: number },
+    arg1: number | Lane,
+    arg2?: number | Lane | { x: number; y: number; radiusX: number; radiusY: number },
+    arg3?: Lane | { x: number; y: number; radiusX: number; radiusY: number },
+    _arg4?: boolean,
+    arg5?: { x: number; y: number; radiusX: number; radiusY: number },
   ): boolean {
     // Only collide when close in perspective (z roughly between 0.05 and 0.18)
     if (this.z > 0.18 || this.z < 0.05) return false;
 
-    // Primary check: Lane match
-    const isSameLane = playerLane === this.lane;
+    let playerRoadX: number;
+    let bounds: { x: number; y: number; radiusX: number; radiusY: number } | undefined;
+
+    if (typeof arg1 === 'number' && typeof arg2 === 'number' && (arg2 === -1 || arg2 === 0 || arg2 === 1)) {
+      // Called as (playerRoadX, playerCurrentLane, playerTargetLane, isChangingLane, bounds)
+      playerRoadX = arg1;
+      bounds = arg5;
+    } else if (typeof arg1 === 'number' && typeof arg2 === 'number') {
+      // Called as (playerLane, playerRoadX, bounds)
+      playerRoadX = arg2;
+      bounds = typeof arg3 === 'object' && arg3 !== null && 'radiusX' in arg3 ? (arg3 as { x: number; y: number; radiusX: number; radiusY: number }) : undefined;
+    } else if (typeof arg1 === 'number') {
+      playerRoadX = arg1;
+      bounds = typeof arg2 === 'object' && arg2 !== null && 'radiusX' in arg2 ? (arg2 as { x: number; y: number; radiusX: number; radiusY: number }) : undefined;
+    } else {
+      playerRoadX = getLaneRoadX(arg1 as Lane);
+      bounds = typeof arg2 === 'object' && arg2 !== null && 'radiusX' in arg2 ? (arg2 as { x: number; y: number; radiusX: number; radiusY: number }) : undefined;
+    }
+
     const roadXDist = Math.abs(playerRoadX - this.roadX);
 
-    // If player is safely in another lane, zero collision
-    if (!isSameLane && roadXDist > 0.28) {
+    // If player is safely outside this obstacle's lane boundary (> 0.28 road units), zero collision
+    if (roadXDist > 0.28) {
       return false;
     }
 
-    // If in same lane or transition distance within hitbox
-    if (roadXDist < 0.32) {
+    // Physical overlap threshold (lateral distance within collision hitbox)
+    if (roadXDist <= 0.25) {
       return true;
     }
 
-    if (playerScreenBounds) {
+    if (bounds) {
       const pt = projectRoad(this.roadX, this.z);
       const obsY = pt.y - 20 * pt.scale;
-      const obsRadiusX = 26 * pt.scale;
-      const obsRadiusY = 18 * pt.scale;
+      const obsRadiusX = 24 * pt.scale;
+      const obsRadiusY = 16 * pt.scale;
 
-      const dx = Math.abs(pt.x - playerScreenBounds.x);
-      const dy = Math.abs(obsY - playerScreenBounds.y);
+      const dx = Math.abs(pt.x - bounds.x);
+      const dy = Math.abs(obsY - bounds.y);
 
-      return dx < (obsRadiusX + playerScreenBounds.radiusX) &&
-             dy < (obsRadiusY + playerScreenBounds.radiusY);
+      return dx < (obsRadiusX + bounds.radiusX) &&
+             dy < (obsRadiusY + bounds.radiusY);
     }
 
     return false;

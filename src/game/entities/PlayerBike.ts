@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { getLaneRoadX, getNearestLane, TUNING } from '../data/tuning';
+import { getLaneRoadX, TUNING } from '../data/tuning';
 import type { Lane } from '../data/tuning';
 import { projectRoad } from '../utils/projection';
 
@@ -9,6 +9,7 @@ export class PlayerBike {
 
   public currentLane: Lane = 0;
   public targetLane: Lane = 0;
+  public isChangingLane = false;
   public roadX = 0;
   public z = TUNING.PLAYER_Z;
   public currentLean = 0;
@@ -41,15 +42,24 @@ export class PlayerBike {
     if (direction === -1) {
       if (this.targetLane > -1) {
         this.targetLane = (this.targetLane - 1) as Lane;
+        this.isChangingLane = true;
         return true;
       }
     } else if (direction === 1) {
       if (this.targetLane < 1) {
         this.targetLane = (this.targetLane + 1) as Lane;
+        this.isChangingLane = true;
         return true;
       }
     }
     return false;
+  }
+
+  /**
+   * Check if player is settled within tolerance of a specific lane.
+   */
+  public isSettledInLane(lane: Lane, tolerance = 0.16): boolean {
+    return Math.abs(this.roadX - getLaneRoadX(lane)) <= tolerance;
   }
 
   public update(dt: number): void {
@@ -60,11 +70,18 @@ export class PlayerBike {
     const lerpFactor = Math.min(1.0, dt * TUNING.LANE_SWITCH_SPEED);
     this.roadX += diffX * lerpFactor;
 
-    // Update currentLane based on proximity
-    if (Math.abs(diffX) < 0.05) {
+    // Arrival tolerance: when player is within 0.05 road units, lane shift is complete
+    const ARRIVAL_TOLERANCE = 0.05;
+    if (Math.abs(diffX) < ARRIVAL_TOLERANCE) {
+      this.roadX = targetRoadX;
       this.currentLane = this.targetLane;
+      this.isChangingLane = false;
     } else {
-      this.currentLane = getNearestLane(this.roadX);
+      this.isChangingLane = true;
+      // In transition, if player has moved substantially into target lane (within 0.14)
+      if (Math.abs(diffX) <= 0.14) {
+        this.currentLane = this.targetLane;
+      }
     }
 
     // Dynamic motorcycle lean angle during lane shift

@@ -71,16 +71,17 @@ export class SpawnerSystem {
     pattern: SpawnPattern,
     onSpawnObstacle: (obs: ObstacleEntity) => void,
     onSpawnDog: (dog: DogEntity) => void,
-    overrides?: { dogLane?: Lane; obstacleLane?: Lane; z?: number },
+    overrides?: { dogLane?: Lane; obstacleLane?: Lane; z?: number; dogZ?: number; obstacleZ?: number },
   ): void {
-    const z = overrides?.z ?? 1.0;
+    const baseZ = overrides?.z ?? 1.0;
 
     switch (pattern) {
       case 'SINGLE_OBSTACLE': {
         const availableLanes = LANES.filter((l) => l !== this.lastObstacleLane);
         const lane = overrides?.obstacleLane ?? availableLanes[Phaser.Math.Between(0, availableLanes.length - 1)]!;
         this.lastObstacleLane = lane;
-        const obs = new ObstacleEntity(this.scene, lane, z);
+        const obsZ = overrides?.obstacleZ ?? baseZ;
+        const obs = new ObstacleEntity(this.scene, lane, obsZ);
         onSpawnObstacle(obs);
         break;
       }
@@ -89,8 +90,9 @@ export class SpawnerSystem {
         // Pick one safe lane that remains open (player can always pass)
         const safeLane: Lane = LANES[Phaser.Math.Between(0, LANES.length - 1)]!;
         const blockedLanes = LANES.filter((l) => l !== safeLane);
+        const obsZ = overrides?.obstacleZ ?? baseZ;
         for (const lane of blockedLanes) {
-          const obs = new ObstacleEntity(this.scene, lane, z);
+          const obs = new ObstacleEntity(this.scene, lane, obsZ);
           onSpawnObstacle(obs);
         }
         break;
@@ -98,7 +100,8 @@ export class SpawnerSystem {
 
       case 'DOG_TARGET': {
         const lane = overrides?.dogLane ?? LANES[Phaser.Math.Between(0, LANES.length - 1)]!;
-        const dog = new DogEntity(this.scene, DEFAULT_DOG, lane, z);
+        const dogZ = overrides?.dogZ ?? baseZ;
+        const dog = new DogEntity(this.scene, DEFAULT_DOG, lane, dogZ);
         onSpawnDog(dog);
         break;
       }
@@ -112,8 +115,13 @@ export class SpawnerSystem {
 
         this.lastObstacleLane = obstacleLane;
 
-        const dog = new DogEntity(this.scene, DEFAULT_DOG, dogLane, z);
-        const obs = new ObstacleEntity(this.scene, obstacleLane, z);
+        // Depth separation: Obstacle is ahead (closer to player at ~0.78), Dog is behind in the distance (~1.02)
+        // Separated by at least 0.22 z-units to prevent flat wave spawn
+        const obsZ = overrides?.obstacleZ ?? Math.max(0.65, baseZ - 0.22);
+        const dogZ = overrides?.dogZ ?? (baseZ > 0.95 ? 1.02 : baseZ);
+
+        const dog = new DogEntity(this.scene, DEFAULT_DOG, dogLane, dogZ);
+        const obs = new ObstacleEntity(this.scene, obstacleLane, obsZ);
 
         onSpawnDog(dog);
         onSpawnObstacle(obs);

@@ -287,13 +287,13 @@ export class RideScene extends Phaser.Scene {
       (dog) => this.dogs.push(dog),
     );
 
-    // Check dog hook readiness & orient bamboo pole side (requires player to be in dog's lane!)
+    // Check dog hook readiness & orient bamboo pole side (requires player to be physically settled in dog's lane!)
     let isAnyDogReady = false;
     let targetDogSide: 'left' | 'right' = 'right';
 
     for (const d of this.dogs) {
       if (d.active && !d.escaped) {
-        if (d.getHookState() === 'HOOKABLE' && d.lane === this.player.targetLane) {
+        if (d.getHookState() === 'HOOKABLE' && this.player.isSettledInLane(d.lane)) {
           isAnyDogReady = true;
           targetDogSide = d.roadX < 0 ? 'left' : 'right';
           break;
@@ -313,13 +313,13 @@ export class RideScene extends Phaser.Scene {
       });
     }
 
-    // Update obstacles and collision check (enforcing lane match)
+    // Update obstacles and collision check (transition-aware)
     const playerBounds = this.player.getScreenBounds();
     for (let i = this.obstacles.length - 1; i >= 0; i--) {
       const obs = this.obstacles[i]!;
       obs.update(dt, currentSpeed);
 
-      if (obs.checkCollision(this.player.targetLane, this.player.roadX, playerBounds)) {
+      if (obs.checkCollision(this.player.roadX, this.player.currentLane, this.player.targetLane, this.player.isChangingLane, playerBounds)) {
         this.handleCrash();
         return;
       }
